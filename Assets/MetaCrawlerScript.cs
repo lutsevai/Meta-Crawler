@@ -37,11 +37,16 @@ public class MetaCrawlerScript : MonoBehaviour
     // categorized reaction times by zoid [rotations, fall_speed] 
     List<string[]>[,] rtList_categorized;
 
+    //structure for per-subject reaction times
+    Dictionary<string, List<string[]>[,]> subjectRTs;
+
 
     // Start is called before the first frame update
     void Start()
     {
         // VARIABLE INITIALIZATION
+
+        subjectRTs = new Dictionary<string, List<string[]>[,]>();
 
         rtList_raw = new List<string[]>[Enum.GetNames(typeof(ZoidType)).Length, levelCount];
         // initialize individual structures inside the big one 
@@ -62,8 +67,6 @@ public class MetaCrawlerScript : MonoBehaviour
                 rtList_categorized[i, j] = new List<string[]>();
             }
         }
-
-        subjectRTs = new Dictionary<string, List<string[]>[,]>();
 
 
         // SETTING DIRS
@@ -88,7 +91,6 @@ public class MetaCrawlerScript : MonoBehaviour
                 // Adding all values from the raw lists in the current loop to the corresponding node in the rotation/speedlvl structure.
                 rtList_categorized[cRot, cSpeedRank].AddRange(rtList_raw[zoidNr, lvl]);
             }
-
         }
 
         // OUTPUT
@@ -125,38 +127,37 @@ public class MetaCrawlerScript : MonoBehaviour
             }
         }
 
-
-
         // create summary datastructure of RTs for all rot-types, all levels
         List<List<string>> allRots_allSpeedRanks = new List<List<string>>();
-
 
         //write a summary of all rts per speedstep to a single file, 3 columns
         for (int speedRank = 0; speedRank < rtList_categorized.GetLength(1); speedRank++)
         {
-            List<string>[] listRots_speedRank = new List<string>[3];
-            for (int i = 0; i < listRots_speedRank.Length; i++)
+            List<string>[] listRots = new List<string>[3];
+            for (int i = 0; i < listRots.Length; i++)
             {
-                listRots_speedRank[i] = new List<string>();
+                listRots[i] = new List<string>();
             }
 
+            //extract the first column of the log containing the timestamp
             for (int rot = 0; rot < rtList_categorized.GetLength(0); rot++)
             {
                 foreach (string[] lineSlit in rtList_categorized[rot, speedRank])
                 {
-                    listRots_speedRank[rot].Add(lineSlit[0]);
+                    listRots[rot].Add(lineSlit[(int)Header.timestamp]);
                 }
             }
 
-            foreach(List<string> list in listRots_speedRank)
+            // add all extracted RTs to the general rots list
+            foreach (List<string> list in listRots)
             {
                 allRots_allSpeedRanks.Add(list);
             }
 
-            List<string> rotLines = merge(listRots_speedRank, sep);
+            List<string> mergedRots = merge(listRots, sep);
 
             string fileName = String.Format("speedRank{0}_allRot", speedRank);
-            File.WriteAllLines(outDir + fileName + logExtension, rotLines.ToArray());
+            File.WriteAllLines(outDir + fileName + logExtension, mergedRots.ToArray());
         }
 
         //Writing a summary file with all rts, categorized by rotation, and levels
@@ -267,7 +268,6 @@ public class MetaCrawlerScript : MonoBehaviour
 
     void ExtractRtData(string infile, string outfile)
     {
-
         List<string[]> output = new List<string[]>();
         string[] lines = File.ReadAllLines(infile);
 
@@ -295,29 +295,26 @@ public class MetaCrawlerScript : MonoBehaviour
             string[] lineSplit = lines[i].Split('\t');
             if (containsEvent(lineSplit, "ZOID", "NEW"))
             {
-
                 // search for the first action after zoid appearance
                 for (int j = i + 1; j < lines.Length; j++)
                 {
                     string[] lineSplit_j = lines[j].Split('\t');
 
-                    // found key down, add it
+                    // found key down
                     //todo: what about key up?!
                     if (containsEvent(lineSplit_j, "PLAYER", "KEY_DOWN"))
                     {
-                        float diff = float.Parse(lineSplit_j[(int)Header.timestamp]) - float.Parse(lineSplit[0]);
-
-                        lineSplit_j[0] = Math.Round((Decimal)diff, 5, MidpointRounding.AwayFromZero).ToString();
-
-                        foreach (ZoidType zoid in Enum.GetValues(typeof(ZoidType)))
+                        // add it, if both times are not different
+                        // todo: check frequency of presses, perhaps they coincide, because it is anticipated
+                        if (!lineSplit_j[(int)Header.timestamp].Equals(lineSplit[0]))
                         {
-                            if (lineSplit_j[(int)Header.curr_zoid].Equals(zoid.ToString()))
-                            {
-                                int level = int.Parse(lineSplit_j[(int)Header.level]);
-                                rtList_raw[(int)zoid, level].Add(lineSplit_j);
-                                Debug.Log(string.Format("adding lvl {0} , zoid {1}", lineSplit_j[(int)Header.level], zoid.ToString()));
-                                break;
-                            }
+                            float diff = float.Parse(lineSplit_j[(int)Header.timestamp]) - float.Parse(lineSplit[0]);
+                            lineSplit_j[0] = Math.Round((Decimal)diff, 5, MidpointRounding.AwayFromZero).ToString();
+
+                            ZoidType thisZoid = GetZoidType(lineSplit_j[(int)Header.curr_zoid]);
+                            int level = int.Parse(lineSplit_j[(int)Header.level]);
+                            rtList_raw[(int)thisZoid, level].Add(lineSplit_j);
+                            break;
                         }
                         i = j;
                         break;
@@ -326,14 +323,12 @@ public class MetaCrawlerScript : MonoBehaviour
                     else if (containsEvent(lineSplit_j, "ZOID", "NEW"))
                     {
                         // jump to the that line-1, do nothing
-
                         i = j - 1;
                         break;
                     }
                 }
             }
         }
-
         WriteRTsToFile(outfile, output);
     }
 
@@ -351,7 +346,6 @@ public class MetaCrawlerScript : MonoBehaviour
         {
             outlines[i] = string.Join("\t", rtData[i]);
         }
-
         // write the result to file
         File.WriteAllLines(path, outlines);
     }
@@ -405,6 +399,11 @@ public class MetaCrawlerScript : MonoBehaviour
     }
 
 
+    /// <summary>
+    /// Matches an input string to the corresponding ZoidType, if present
+    /// </summary>
+    /// <param name="z">zoid name</param>
+    /// <returns>zoid type matching the input</returns>
     ZoidType GetZoidType(string z)
     {
         foreach (ZoidType zoid in Enum.GetValues(typeof(ZoidType)))
@@ -419,7 +418,11 @@ public class MetaCrawlerScript : MonoBehaviour
     }
 
 
-
+    /// <summary>
+    /// Matches an input ordinal position to the corresponding ZoidType, if present
+    /// </summary>
+    /// <param name="z">zoid position in the enum list</param>
+    /// <returns>zoid type matching the input</returns>
     ZoidType GetZoidType(int z)
     {
         return (ZoidType)Enum.GetValues(typeof(ZoidType)).GetValue(z);
