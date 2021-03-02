@@ -17,6 +17,7 @@ public class MetaCrawlerScript : MonoBehaviour
     //constants & read-onlys
 
     // total amount of possible levels in the datastructure
+    const char sep = '\t';
     const int levelCount = 19;
     const string logExtension = ".tsv";
     const string inDir_test = @"D:\documents\rpi\cwl\meta-two\rt\";
@@ -61,6 +62,8 @@ public class MetaCrawlerScript : MonoBehaviour
                 rtList_categorized[i, j] = new List<string[]>();
             }
         }
+
+        subjectRTs = new Dictionary<string, List<string[]>[,]>();
 
 
         // SETTING DIRS
@@ -122,6 +125,12 @@ public class MetaCrawlerScript : MonoBehaviour
             }
         }
 
+
+
+        // create summary datastructure of RTs for all rot-types, all levels
+        List<List<string>> allRots_allSpeedRanks = new List<List<string>>();
+
+
         //write a summary of all rts per speedstep to a single file, 3 columns
         for (int speedRank = 0; speedRank < rtList_categorized.GetLength(1); speedRank++)
         {
@@ -139,19 +148,52 @@ public class MetaCrawlerScript : MonoBehaviour
                 }
             }
 
-            List<string> rotLines = new List<string>();
-            int cLine = 0;
-            while (cLine < listRots_speedRank[0].Count || cLine < listRots_speedRank[1].Count || cLine < listRots_speedRank[2].Count)
+            foreach(List<string> list in listRots_speedRank)
             {
-                rotLines.Add(getElem(listRots_speedRank[0], cLine) + '\t' + getElem(listRots_speedRank[1], cLine) + '\t' + getElem(listRots_speedRank[2], cLine));
-                cLine++;
+                allRots_allSpeedRanks.Add(list);
             }
+
+            List<string> rotLines = merge(listRots_speedRank, sep);
 
             string fileName = String.Format("speedRank{0}_allRot", speedRank);
             File.WriteAllLines(outDir + fileName + logExtension, rotLines.ToArray());
         }
 
+        //Writing a summary file with all rts, categorized by rotation, and levels
+        List<string> allRots_allRanksMerged = merge(allRots_allSpeedRanks.ToArray(), sep);
+        File.WriteAllLines(outDir + "allRTs_allSpeedRanks" + logExtension, allRots_allRanksMerged.ToArray());
     }
+
+
+    List<string> merge(List<string>[] listarray, char sep)
+    {
+        List<string> result = new List<string>();
+
+        //determening the longest list
+        int max = 0;
+        foreach (List<string> list in listarray)
+        {
+            if (list.Count > max)
+            {
+                max = list.Count;
+            }
+        }
+
+        //merging the elements of the list
+        for (int i = 0; i < max; i++)
+        {
+            string line = "";
+            foreach (List<string> list in listarray)
+            {
+                line += getElem(list, i) + sep;
+            }
+            //trims out the last sep-char, and adds to the results
+            result.Add(line.Remove(line.Length - 1));
+        }
+
+        return result;
+    }
+
 
 
     string getElem(List<string> list, int i)
@@ -165,6 +207,7 @@ public class MetaCrawlerScript : MonoBehaviour
             return "";
         }
     }
+
 
 
     void WalkDirectoryTree(System.IO.DirectoryInfo root)
