@@ -8,75 +8,163 @@ using System.IO;
 public class MetaCrawlerScript : MonoBehaviour
 {
     //public static string names = "IOTSZJL";
-    enum Rotations { no, one, two };
     enum ZoidType { O, I, S, Z, J, L, T }
-    // enum SpeedSteps { zero, one, two, three, four, five, six, seven, eight, nine, ten, thriteen, sixteen };
-    //                0            1           2             3           4      5          6          7        8           9          10        11
+    enum SpeedLevelString { zero, one, two, three, four, five, six, seven, eight, nine, ten, thriteen, sixteen, nineteen, twentynine };
+
+    //column nr:      0            1           2             3           4      5          6          7        8           9          10        11
     enum Header { timestamp, system_ticks, event_type, episode_number, level, score, lines_cleared, evt_id, evt_data1, evt_data2, curr_zoid, next_zoid };
 
-    //constants
-    const int maxLvl = 18;
+    //constants & read-onlys
+
+    // total amount of possible levels in the datastructure
+    const int levelCount = 19;
     const string logExtension = ".tsv";
     const string inDir_test = @"D:\documents\rpi\cwl\meta-two\rt\";
     const string inDir_ctwc20 = @"F:\SIWIEL\CTWC20\SpeedTetris_version-2\";
     const string outDir_standard = @"D:\documents\rpi\cwl\meta-two\rt_out\";
 
+    // readonly int[] levels = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29 }
+    readonly int[] speedLevels = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 16, 19, 29 };
+    readonly int[] rotations = { 0, 1, 2 };
+
     string inDir;
     string outDir;
 
-    // array to sort all reaction times, format [zoidType,SpeedSteps]
-    List<string[]>[,] commulitativeRTs;
+    // initial raw sort all reaction times, format [zoidType,level]
+    List<string[]>[,] rtList_raw;
 
-    //structure for per-subject reaction times
-    Dictionary<string, List<string[]>[,]> subjectRTs;
+    // categorized reaction times by zoid [rotations, fall_speed] 
+    List<string[]>[,] rtList_categorized;
 
 
     // Start is called before the first frame update
     void Start()
     {
-        //variable initialization
-        commulitativeRTs = new List<string[]>[Enum.GetNames(typeof(ZoidType)).Length, maxLvl + 1];
-        subjectRTs = new Dictionary<string, List<string[]>[,]>();
+        // VARIABLE INITIALIZATION
 
-
-        // creates structures to put the sorted RTs in
-        for (int i = 0; i < commulitativeRTs.GetLength(0); i++)
+        rtList_raw = new List<string[]>[Enum.GetNames(typeof(ZoidType)).Length, levelCount];
+        // initialize individual structures inside the big one 
+        for (int i = 0; i < rtList_raw.GetLength(0); i++)
         {
-            for (int j = 0; j < commulitativeRTs.GetLength(1); j++)
+            for (int j = 0; j < rtList_raw.GetLength(1); j++)
             {
-                commulitativeRTs[i, j] = new List<string[]>();
+                rtList_raw[i, j] = new List<string[]>();
             }
         }
 
-        Debug.Log("big stru 1 " + commulitativeRTs.GetLength(0));
-        Debug.Log("big stru 2 " + commulitativeRTs.GetLength(1));
+        rtList_categorized = new List<string[]>[rotations.GetLength(0), speedLevels.GetLength(0)];
+        // initialize individual structures inside the big one
+        for (int i = 0; i < rtList_categorized.GetLength(0); i++)
+        {
+            for (int j = 0; j < rtList_categorized.GetLength(1); j++)
+            {
+                rtList_categorized[i, j] = new List<string[]>();
+            }
+        }
 
-        // setting directories
+
+        // SETTING DIRS
         inDir = inDir_test;
         outDir = outDir_standard;
 
-        // raw data processing
+        // RAW DATA PROCESSING
         WalkDirectoryTree(new DirectoryInfo(inDir));
 
-        // post processing
+        // POST PROCESSING
+
+        // sort data by [rotationNr , speedRank]
+        for (int zoidNr = 0; zoidNr < rtList_raw.GetLength(0); zoidNr++)
+        {
+            int cRot = GetRotations(zoidNr);
+
+            for (int lvl = 0; lvl < rtList_raw.GetLength(1); lvl++)
+            {
+                // Determening the position of the level in speedArray
+                int cSpeedRank = getSpeedRank(lvl);
+
+                // Adding all values from the raw lists in the current loop to the corresponding node in the rotation/speedlvl structure.
+                rtList_categorized[cRot, cSpeedRank].AddRange(rtList_raw[zoidNr, lvl]);
+            }
+
+        }
 
         // OUTPUT
-        
-        // write RT to separate files for each lvl, and zoid type
-        for (int zoid = 0; zoid < commulitativeRTs.GetLength(0); zoid++)
+
+        // clear output folder
+        System.IO.DirectoryInfo di = new DirectoryInfo(outDir);
+        foreach (FileInfo file in di.GetFiles())
         {
-            for (int level = 0; level < commulitativeRTs.GetLength(1); level++)
+            file.Delete();
+        }
+        foreach (DirectoryInfo dir in di.GetDirectories())
+        {
+            dir.Delete(true);
+        }
+
+        // write RT to separate files for each lvl, and zoid type
+        for (int zoid = 0; zoid < rtList_raw.GetLength(0); zoid++)
+        {
+            for (int level = 0; level < rtList_raw.GetLength(1); level++)
             {
-                string zoidName = Enum.GetValues(typeof(ZoidType)).GetValue(zoid).ToString();
+                string zoidName = GetZoidType(zoid).ToString();
                 string fileName = String.Format("lvl{0}_{1}", level, zoidName);
-                WriteRTsToFile(commulitativeRTs[zoid, level], outDir + fileName + logExtension);
+                WriteRTsToFile(outDir + fileName + logExtension, rtList_raw[zoid, level]);
             }
         }
 
+        // write RT to separate files for each speedstep, and rotation type
+        for (int rot = 0; rot < rtList_categorized.GetLength(0); rot++)
+        {
+            for (int speedRank = 0; speedRank < rtList_categorized.GetLength(1); speedRank++)
+            {
+                string fileName = String.Format("speed{0}_rot{1}", speedRank, rot);
+                WriteRTsToFile(outDir + fileName + logExtension, rtList_categorized[rot, speedRank]);
+            }
+        }
 
+        //write a summary of all rts per speedstep to a single file, 3 columns
+        for (int speedRank = 0; speedRank < rtList_categorized.GetLength(1); speedRank++)
+        {
+            List<string>[] listRots_speedRank = new List<string>[3];
+            for (int i = 0; i < listRots_speedRank.Length; i++)
+            {
+                listRots_speedRank[i] = new List<string>();
+            }
+
+            for (int rot = 0; rot < rtList_categorized.GetLength(0); rot++)
+            {
+                foreach (string[] lineSlit in rtList_categorized[rot, speedRank])
+                {
+                    listRots_speedRank[rot].Add(lineSlit[0]);
+                }
+            }
+
+            List<string> rotLines = new List<string>();
+            int cLine = 0;
+            while (cLine < listRots_speedRank[0].Count || cLine < listRots_speedRank[1].Count || cLine < listRots_speedRank[2].Count)
+            {
+                rotLines.Add(getElem(listRots_speedRank[0], cLine) + '\t' + getElem(listRots_speedRank[1], cLine) + '\t' + getElem(listRots_speedRank[2], cLine));
+                cLine++;
+            }
+
+            string fileName = String.Format("speedRank{0}_allRot", speedRank);
+            File.WriteAllLines(outDir + fileName + logExtension, rotLines.ToArray());
+        }
 
     }
 
+
+    string getElem(List<string> list, int i)
+    {
+        if (i < list.Count)
+        {
+            return list[i];
+        }
+        else
+        {
+            return "";
+        }
+    }
 
 
     void WalkDirectoryTree(System.IO.DirectoryInfo root)
@@ -183,7 +271,7 @@ public class MetaCrawlerScript : MonoBehaviour
                             if (lineSplit_j[(int)Header.curr_zoid].Equals(zoid.ToString()))
                             {
                                 int level = int.Parse(lineSplit_j[(int)Header.level]);
-                                commulitativeRTs[(int)zoid, level].Add(lineSplit_j);
+                                rtList_raw[(int)zoid, level].Add(lineSplit_j);
                                 Debug.Log(string.Format("adding lvl {0} , zoid {1}", lineSplit_j[(int)Header.level], zoid.ToString()));
                                 break;
                             }
@@ -203,16 +291,16 @@ public class MetaCrawlerScript : MonoBehaviour
             }
         }
 
-        WriteRTsToFile(output, outfile);
+        WriteRTsToFile(outfile, output);
     }
 
 
     /// <summary>
     /// Writes the passed list structure to a file
     /// </summary>
-    /// <param name="rtData">Data that has to be written out.</param>
     /// <param name="path">File to which the data has to be written to.</param>
-    void WriteRTsToFile(List<string[]> rtData, string path)
+    /// <param name="rtData">Data that has to be written out.</param>
+    void WriteRTsToFile(string path, List<string[]> rtData)
     {
         // convert collected values to string array
         string[] outlines = new string[rtData.Count];
@@ -273,4 +361,86 @@ public class MetaCrawlerScript : MonoBehaviour
         return line.Split('\t');
     }
 
+
+    ZoidType GetZoidType(string z)
+    {
+        foreach (ZoidType zoid in Enum.GetValues(typeof(ZoidType)))
+        {
+            if (z.Equals(zoid.ToString()))
+            {
+                return zoid;
+            }
+        }
+
+        throw new InvalidDataException("Invalid Zoid Type input provided: " + z);
+    }
+
+
+
+    ZoidType GetZoidType(int z)
+    {
+        return (ZoidType)Enum.GetValues(typeof(ZoidType)).GetValue(z);
+    }
+
+
+    /// <summary>
+    /// Returns the amount of rotations that can be performed on a zoid
+    /// </summary>
+    /// <param name="z">Zoid ordinal number to be analyzed for rotations</param>
+    /// <returns></returns>
+    int GetRotations(int z)
+    {
+        ZoidType zoid = GetZoidType(z);
+        return GetRotations(zoid);
+    }
+
+
+    /// <summary>
+    /// Returns the amount of rotations that can be performed on a zoid
+    /// </summary>
+    /// <param name="z">Zoid to be analyzed for rotations</param>
+    /// <returns></returns>
+    int GetRotations(string z)
+    {
+        return GetRotations(GetZoidType(z));
+    }
+
+
+    /// <summary>
+    /// Returns the amount of rotations that can be performed on a zoid
+    /// </summary>
+    /// <param name="zoid">Zoid to be analyzed for rotations</param>
+    /// <returns></returns>
+    int GetRotations(ZoidType zoid)
+    {
+        if (zoid.Equals(ZoidType.O))
+        {
+            return 0;
+        }
+        else if (zoid.Equals(ZoidType.I) || zoid.Equals(ZoidType.S) || zoid.Equals(ZoidType.Z))
+        {
+            return 1;
+        }
+        else if (zoid.Equals(ZoidType.J) || zoid.Equals(ZoidType.L) || zoid.Equals(ZoidType.T))
+        {
+            return 2;
+        }
+        else
+        {
+            throw new InvalidDataException("Invalid Zoid Type provided for rotations: " + zoid.ToString());
+        }
+    }
+
+
+
+    int getSpeedRank(int lvl)
+    {
+        int cSpeed = 0;
+        while ((speedLevels[cSpeed] < lvl) && (cSpeed < speedLevels.Length))
+        {
+            cSpeed++;
+        }
+
+        return cSpeed;
+    }
 }
