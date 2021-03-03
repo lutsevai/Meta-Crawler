@@ -157,49 +157,6 @@ public class MetaCrawlerScript : MonoBehaviour
         File.WriteAllLines(dirPath + "allRTs_allSpeedRanks" + logExtension, allRots_allRanksMerged.ToArray());
     }
 
-    List<string> merge(List<string>[] listarray, char sep)
-    {
-        List<string> result = new List<string>();
-
-        //determening the longest list
-        int max = 0;
-        foreach (List<string> list in listarray)
-        {
-            if (list.Count > max)
-            {
-                max = list.Count;
-            }
-        }
-
-        //merging the elements of the list
-        for (int i = 0; i < max; i++)
-        {
-            string line = "";
-            foreach (List<string> list in listarray)
-            {
-                line += getElem(list, i) + sep;
-            }
-            //trims out the last sep-char, and adds to the results
-            result.Add(line.Remove(line.Length - 1));
-        }
-
-        return result;
-    }
-
-
-
-    string getElem(List<string> list, int i)
-    {
-        if (i < list.Count)
-        {
-            return list[i];
-        }
-        else
-        {
-            return "";
-        }
-    }
-
 
 
     void WalkDirectoryTree(System.IO.DirectoryInfo root)
@@ -366,6 +323,61 @@ public class MetaCrawlerScript : MonoBehaviour
 
 
     /// <summary>
+    /// Merges all elements at the ith position of each list in the passed array into single string lines, separated by a separator, adds them to a list, and returns them
+    /// </summary>
+    /// <param name="listarray">Main data structure, whose elements have to be merged.</param>
+    /// <param name="sep">A separator which will be put between each merging element.</param>
+    /// <returns>List of the merged string elements.</returns>
+    List<string> merge(List<string>[] listarray, char sep)
+    {
+        List<string> result = new List<string>();
+
+        //determening the longest list
+        int max = 0;
+        foreach (List<string> list in listarray)
+        {
+            if (list.Count > max)
+            {
+                max = list.Count;
+            }
+        }
+
+        //merging the elements of the list
+        for (int i = 0; i < max; i++)
+        {
+            string line = "";
+            foreach (List<string> list in listarray)
+            {
+                line += getElem(list, i) + sep;
+            }
+            //trims out the last sep-char, and adds to the results
+            result.Add(line.Remove(line.Length - 1));
+        }
+
+        return result;
+    }
+
+
+    /// <summary>
+    /// Fetches an element from a string list by its ordianl position in the list, or returns an empty string, if the position exceeds the size of the list.
+    /// </summary>
+    /// <param name="list">String list, from which the string is to be fetched.</param>
+    /// <param name="i">Position of the string in the list.</param>
+    /// <returns>String at the ith position, or an empty string, if the position exceeds the size of the list.</returns>
+    string getElem(List<string> list, int i)
+    {
+        if (i < list.Count)
+        {
+            return list[i];
+        }
+        else
+        {
+            return "";
+        }
+    }
+
+
+    /// <summary>
     /// Checks whether a line from the log contains a certain event.
     /// </summary>
     /// <param name="lineSplit">The line to be checked for the event string.</param>
@@ -491,7 +503,11 @@ public class MetaCrawlerScript : MonoBehaviour
     }
 
 
-
+    /// <summary>
+    /// Determines in which speed category the current lvl is in, and returns it
+    /// </summary>
+    /// <param name="lvl"> current Tetris level</param>
+    /// <returns>The speed category of the passed level.</returns>
     int getSpeedRank(int lvl)
     {
         int cSpeed = 0;
@@ -504,14 +520,22 @@ public class MetaCrawlerScript : MonoBehaviour
     }
 
 
-
+    /// <summary>
+    /// Wrapper method for NewLoa. Used to create a 2dimensional array of lists for the rt raw data format [zoidType,levelCount].
+    /// </summary>
+    /// <returns>Fully initialized 2-dimensional array of lists [zoidType,levelCount].</returns>
     List<string[]>[,] NewLoA_Raw()
     {
         return NewLoA(Enum.GetNames(typeof(ZoidType)).Length, levelCount);
     }
 
 
-
+    /// <summary>
+    /// Initializes a 2-dimensional array of lists, and initiates each node with an empty list.
+    /// </summary>
+    /// <param name="x_length">Size of the 1st dimension of the array to be created.</param>
+    /// <param name="y_length">Size of the 2nd dimension of the array to be created.</param>
+    /// <returns>Fully initialized 2-dimensional array of lists.</returns>
     List<string[]>[,] NewLoA(int x_length, int y_length)
     {
         List<string[]>[,] newStruct = new List<string[]>[x_length, y_length];
