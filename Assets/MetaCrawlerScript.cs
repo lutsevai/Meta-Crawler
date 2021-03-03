@@ -16,8 +16,8 @@ public class MetaCrawlerScript : MonoBehaviour
 
     //constants & read-onlys
 
-    // total amount of possible levels in the datastructure
     const char sep = '\t';
+    // total amount of possible levels in the datastructure
     const int levelCount = 19;
     const string logExtension = ".tsv";
     const string inDir_test = @"D:\documents\rpi\cwl\meta-two\rt\";
@@ -32,10 +32,7 @@ public class MetaCrawlerScript : MonoBehaviour
     string outDir;
 
     // initial raw sort all reaction times, format [zoidType,level]
-    List<string[]>[,] rtList_raw;
-
-    // categorized reaction times by zoid [rotations, fall_speed] 
-    List<string[]>[,] rtList_categorized;
+    List<string[]>[,] rts_raw_all;
 
     //structure for per-subject reaction times
     Dictionary<string, List<string[]>[,]> subjectRTs;
@@ -45,55 +42,12 @@ public class MetaCrawlerScript : MonoBehaviour
     void Start()
     {
         // VARIABLE INITIALIZATION
-
         subjectRTs = new Dictionary<string, List<string[]>[,]>();
-
-        rtList_raw = new List<string[]>[Enum.GetNames(typeof(ZoidType)).Length, levelCount];
-        // initialize individual structures inside the big one 
-        for (int i = 0; i < rtList_raw.GetLength(0); i++)
-        {
-            for (int j = 0; j < rtList_raw.GetLength(1); j++)
-            {
-                rtList_raw[i, j] = new List<string[]>();
-            }
-        }
-
-        rtList_categorized = new List<string[]>[rotations.GetLength(0), speedLevels.GetLength(0)];
-        // initialize individual structures inside the big one
-        for (int i = 0; i < rtList_categorized.GetLength(0); i++)
-        {
-            for (int j = 0; j < rtList_categorized.GetLength(1); j++)
-            {
-                rtList_categorized[i, j] = new List<string[]>();
-            }
-        }
-
+        rts_raw_all = NewLoA_Raw();
 
         // SETTING DIRS
         inDir = inDir_test;
         outDir = outDir_standard;
-
-        // RAW DATA PROCESSING
-        WalkDirectoryTree(new DirectoryInfo(inDir));
-
-        // POST PROCESSING
-
-        // sort data by [rotationNr , speedRank]
-        for (int zoidNr = 0; zoidNr < rtList_raw.GetLength(0); zoidNr++)
-        {
-            int cRot = GetRotations(zoidNr);
-
-            for (int lvl = 0; lvl < rtList_raw.GetLength(1); lvl++)
-            {
-                // Determening the position of the level in speedArray
-                int cSpeedRank = getSpeedRank(lvl);
-
-                // Adding all values from the raw lists in the current loop to the corresponding node in the rotation/speedlvl structure.
-                rtList_categorized[cRot, cSpeedRank].AddRange(rtList_raw[zoidNr, lvl]);
-            }
-        }
-
-        // OUTPUT
 
         // clear output folder
         System.IO.DirectoryInfo di = new DirectoryInfo(outDir);
@@ -106,24 +60,62 @@ public class MetaCrawlerScript : MonoBehaviour
             dir.Delete(true);
         }
 
-        // write RT to separate files for each lvl, and zoid type
-        for (int zoid = 0; zoid < rtList_raw.GetLength(0); zoid++)
+        // RAW DATA PROCESSING
+        WalkDirectoryTree(new DirectoryInfo(inDir));
+
+        // DATA POSTPROCESSING & OUTPUT
+
+        //per-subject
+        foreach (KeyValuePair<string, List<string[]>[,]> kvp in subjectRTs)
         {
-            for (int level = 0; level < rtList_raw.GetLength(1); level++)
+            processRT(outDir + kvp.Key + @"\", kvp.Value);
+        }
+        //summary of all
+        processRT(outDir, rts_raw_all);
+    }
+
+
+
+    void processRT(string dirPath, List<string[]>[,] rts_raw)
+    {
+        Directory.CreateDirectory(dirPath);
+
+        // categorized reaction times by zoid [rotations, fall_speed] 
+        List<string[]>[,] rts_rotlvl_all = NewLoA(rotations.GetLength(0), speedLevels.GetLength(0));
+
+        // sort data by [rotationNr , speedRank]
+        for (int zoidNr = 0; zoidNr < rts_raw.GetLength(0); zoidNr++)
+        {
+            int cRot = GetRotations(zoidNr);
+
+            for (int lvl = 0; lvl < rts_raw.GetLength(1); lvl++)
+            {
+                // Determening the position of the level in speedArray
+                int cSpeedRank = getSpeedRank(lvl);
+
+                // Adding all values from the raw lists in the current loop to the corresponding node in the rotation/speedlvl structure.
+                rts_rotlvl_all[cRot, cSpeedRank].AddRange(rts_raw[zoidNr, lvl]);
+            }
+        }
+
+        // write RT to separate files for each lvl, and zoid type
+        for (int zoid = 0; zoid < rts_raw.GetLength(0); zoid++)
+        {
+            for (int level = 0; level < rts_raw.GetLength(1); level++)
             {
                 string zoidName = GetZoidType(zoid).ToString();
                 string fileName = String.Format("lvl{0}_{1}", level, zoidName);
-                WriteRTsToFile(outDir + fileName + logExtension, rtList_raw[zoid, level]);
+                WriteRTsToFile(dirPath + fileName + logExtension, rts_raw[zoid, level]);
             }
         }
 
         // write RT to separate files for each speedstep, and rotation type
-        for (int rot = 0; rot < rtList_categorized.GetLength(0); rot++)
+        for (int rot = 0; rot < rts_rotlvl_all.GetLength(0); rot++)
         {
-            for (int speedRank = 0; speedRank < rtList_categorized.GetLength(1); speedRank++)
+            for (int speedRank = 0; speedRank < rts_rotlvl_all.GetLength(1); speedRank++)
             {
                 string fileName = String.Format("speed{0}_rot{1}", speedRank, rot);
-                WriteRTsToFile(outDir + fileName + logExtension, rtList_categorized[rot, speedRank]);
+                WriteRTsToFile(dirPath + fileName + logExtension, rts_rotlvl_all[rot, speedRank]);
             }
         }
 
@@ -131,7 +123,7 @@ public class MetaCrawlerScript : MonoBehaviour
         List<List<string>> allRots_allSpeedRanks = new List<List<string>>();
 
         //write a summary of all rts per speedstep to a single file, 3 columns
-        for (int speedRank = 0; speedRank < rtList_categorized.GetLength(1); speedRank++)
+        for (int speedRank = 0; speedRank < rts_rotlvl_all.GetLength(1); speedRank++)
         {
             List<string>[] listRots = new List<string>[3];
             for (int i = 0; i < listRots.Length; i++)
@@ -140,9 +132,9 @@ public class MetaCrawlerScript : MonoBehaviour
             }
 
             //extract the first column of the log containing the timestamp
-            for (int rot = 0; rot < rtList_categorized.GetLength(0); rot++)
+            for (int rot = 0; rot < rts_rotlvl_all.GetLength(0); rot++)
             {
-                foreach (string[] lineSlit in rtList_categorized[rot, speedRank])
+                foreach (string[] lineSlit in rts_rotlvl_all[rot, speedRank])
                 {
                     listRots[rot].Add(lineSlit[(int)Header.timestamp]);
                 }
@@ -157,14 +149,13 @@ public class MetaCrawlerScript : MonoBehaviour
             List<string> mergedRots = merge(listRots, sep);
 
             string fileName = String.Format("speedRank{0}_allRot", speedRank);
-            File.WriteAllLines(outDir + fileName + logExtension, mergedRots.ToArray());
+            File.WriteAllLines(dirPath + fileName + logExtension, mergedRots.ToArray());
         }
 
         //Writing a summary file with all rts, categorized by rotation, and levels
         List<string> allRots_allRanksMerged = merge(allRots_allSpeedRanks.ToArray(), sep);
-        File.WriteAllLines(outDir + "allRTs_allSpeedRanks" + logExtension, allRots_allRanksMerged.ToArray());
+        File.WriteAllLines(dirPath + "allRTs_allSpeedRanks" + logExtension, allRots_allRanksMerged.ToArray());
     }
-
 
     List<string> merge(List<string>[] listarray, char sep)
     {
@@ -242,8 +233,7 @@ public class MetaCrawlerScript : MonoBehaviour
             {
                 if (fi.Extension.Equals(logExtension))
                 {
-
-                    ExtractRtData(fi.FullName, outDir + Path.GetFileName(fi.FullName));
+                    ExtractRtData(fi.FullName, Path.GetFileName(fi.FullName));
                 }
 
                 // In this example, we only access the existing FileInfo object. If we
@@ -276,17 +266,37 @@ public class MetaCrawlerScript : MonoBehaviour
         header[0] = "RT";
         output.Add(header);
 
-        //skip meta-data
+        string sid = "";
+        List<string[]>[,] rts_raw_subject;
+
+
+        //get SID & skip meta-data
         int startIndex = 0;
         foreach (string line in lines)
         {
             string[] lSplit = split(line);
+
+            if (containsEvent(lSplit, "SID"))
+            {
+                sid = lSplit[(int)Header.evt_data1];
+            }
 
             if (containsEvent(lSplit, "GAME", "BEGIN"))
             {
                 break;
             }
             startIndex++;
+        }
+
+        // initialize / find subject - specific structure
+        if (subjectRTs.ContainsKey(sid))
+        {
+            subjectRTs.TryGetValue(sid, out rts_raw_subject);
+        }
+        else
+        {
+            rts_raw_subject = NewLoA_Raw();
+            subjectRTs.Add(sid, rts_raw_subject);
         }
 
         //search for new zoid events + rt
@@ -301,7 +311,7 @@ public class MetaCrawlerScript : MonoBehaviour
                     string[] lineSplit_j = lines[j].Split('\t');
 
                     // found key down
-                    //todo: what about key up?!
+                    // todo: what about key up?!
                     if (containsEvent(lineSplit_j, "PLAYER", "KEY_DOWN"))
                     {
                         // add it, if both times are not different
@@ -313,7 +323,9 @@ public class MetaCrawlerScript : MonoBehaviour
 
                             ZoidType thisZoid = GetZoidType(lineSplit_j[(int)Header.curr_zoid]);
                             int level = int.Parse(lineSplit_j[(int)Header.level]);
-                            rtList_raw[(int)thisZoid, level].Add(lineSplit_j);
+                            rts_raw_all[(int)thisZoid, level].Add(lineSplit_j);
+                            rts_raw_subject[(int)thisZoid, level].Add(lineSplit_j);
+                            output.Add(lineSplit_j);
                             break;
                         }
                         i = j;
@@ -329,7 +341,9 @@ public class MetaCrawlerScript : MonoBehaviour
                 }
             }
         }
-        WriteRTsToFile(outfile, output);
+        string outfolder = outDir + sid + @"\";
+        Directory.CreateDirectory(outfolder);
+        WriteRTsToFile(outfolder + outfile, output);
     }
 
 
@@ -413,7 +427,6 @@ public class MetaCrawlerScript : MonoBehaviour
                 return zoid;
             }
         }
-
         throw new InvalidDataException("Invalid Zoid Type input provided: " + z);
     }
 
@@ -489,4 +502,28 @@ public class MetaCrawlerScript : MonoBehaviour
 
         return cSpeed;
     }
+
+
+
+    List<string[]>[,] NewLoA_Raw()
+    {
+        return NewLoA(Enum.GetNames(typeof(ZoidType)).Length, levelCount);
+    }
+
+
+
+    List<string[]>[,] NewLoA(int x_length, int y_length)
+    {
+        List<string[]>[,] newStruct = new List<string[]>[x_length, y_length];
+        // initialize individual structures inside the big one 
+        for (int i = 0; i < newStruct.GetLength(0); i++)
+        {
+            for (int j = 0; j < newStruct.GetLength(1); j++)
+            {
+                newStruct[i, j] = new List<string[]>();
+            }
+        }
+        return newStruct;
+    }
+
 }
