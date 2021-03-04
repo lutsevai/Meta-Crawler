@@ -5,13 +5,16 @@ using UnityEngine.UI;
 
 public class MainCanvasScript : MonoBehaviour
 {
-    public InputField dirField;
+    public InputField inDirField;
+    public InputField outDirField;
     public GameObject metaCrawl;
+
+    const string outDir_standard = @"D:\documents\data\meta-two\rt\";
 
     // Start is called before the first frame update
     void Start()
     {
-        
+        outDirField.text = outDir_standard;
     }
 
     // Update is called once per frame
@@ -23,6 +26,6 @@ public class MainCanvasScript : MonoBehaviour
     public void GoButtonClick()
     {
         MetaCrawlerScript meta = metaCrawl.GetComponent<MetaCrawlerScript>();
-        meta.Crawl(dirField.text);
+        meta.Crawl(inDirField.text, outDirField.text);
     }
 }

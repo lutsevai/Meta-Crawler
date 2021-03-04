@@ -20,7 +20,6 @@ public class MetaCrawlerScript : MonoBehaviour
     // total amount of possible levels in the datastructure
     const int levelCount = 30;
     const string logExtension = ".tsv";
-    const string outDir_standard = @"D:\documents\data\meta-two\rt\";
 
     readonly int[] levels = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29 };
     readonly int[] speedLevels = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 16, 19, 29 };
@@ -45,17 +44,18 @@ public class MetaCrawlerScript : MonoBehaviour
 
 
     /// <summary>
-    /// Main method of the class - recursively searches a directroy for log files, and process them to extract various aspects of RTs into an output folder
+    /// Main method of the class - recursively searches a directroy for log files, and process them to extract various aspects of RTs into an output folder.
     /// </summary>
-    /// <param name="inDir"></param>
-    public void Crawl(string inDir)
+    /// <param name="newInDir">Path containing the data needed processing.</param>
+    /// <param name="newOutDir">Path to which all the processed data will be written to.</param>
+    public void Crawl(string newInDir, string newOutDir)
     {  
         // VARIABLE INITIALIZATION
         subjectRTs = new Dictionary<string, List<string[]>[,]>();
         rts_raw_all = NewLoA_Raw();
 
         // SETTING DIRS
-        outDir = outDir_standard + Path.GetFileName(inDir.TrimEnd(Path.DirectorySeparatorChar)) + Path.DirectorySeparatorChar;
+        outDir = newOutDir + Path.GetFileName(newInDir.TrimEnd(Path.DirectorySeparatorChar)) + Path.DirectorySeparatorChar;
         Directory.CreateDirectory(outDir);
 
         //clear output directory
@@ -70,7 +70,7 @@ public class MetaCrawlerScript : MonoBehaviour
         }
 
         // RAW DATA PROCESSING
-        WalkDirectoryTree(new DirectoryInfo(inDir));
+        WalkDirectoryTree(new DirectoryInfo(newInDir));
 
         // DATA POSTPROCESSING & OUTPUT
 
