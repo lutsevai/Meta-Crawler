@@ -18,20 +18,14 @@ public class MetaCrawlerScript : MonoBehaviour
 
     const char sep = '\t';
     // total amount of possible levels in the datastructure
-    const int levelCount = 19;
+    const int levelCount = 30;
     const string logExtension = ".tsv";
-    const string inDir_test = @"D:\documents\data\meta-two\raw\9test\";
-    const string inDir_ctwc20 = @"F:\SIWIEL\CTWC20\SpeedTetris_version-2\";
     const string outDir_standard = @"D:\documents\data\meta-two\rt\";
-
-    const string inDir_ctwc20_nonext = @"E:\SIWIEL\CTWC19\meta-two\meta-two_lab_saturday_762\Logs\NONXBO-EXP_a1454dc76cc3f172143859504f49f559\";
-    const string inDir_ctwc20_speed = @"E:\SIWIEL\CTWC19\meta-two\meta-two_lab_friday_762\Logs\SPEEDTETRIS_e28f7b28ed14f38eb7c97752eb03919a\";
 
     readonly int[] levels = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29 };
     readonly int[] speedLevels = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 16, 19, 29 };
     readonly int[] rotations = { 0, 1, 2 };
 
-    string inDir;
     string outDir;
 
     // initial raw sort all reaction times, format [zoidType,level]
@@ -41,15 +35,26 @@ public class MetaCrawlerScript : MonoBehaviour
     Dictionary<string, List<string[]>[,]> subjectRTs;
 
 
+
+
     // Start is called before the first frame update
     void Start()
+    {
+
+    }
+
+
+    /// <summary>
+    /// Main method of the class - recursively searches a directroy for log files, and process them to extract various aspects of RTs into an output folder
+    /// </summary>
+    /// <param name="inDir"></param>
+    public void Crawl(string inDir)
     {  
         // VARIABLE INITIALIZATION
         subjectRTs = new Dictionary<string, List<string[]>[,]>();
         rts_raw_all = NewLoA_Raw();
 
         // SETTING DIRS
-        inDir = inDir_test;
         outDir = outDir_standard + Path.GetFileName(inDir.TrimEnd(Path.DirectorySeparatorChar)) + Path.DirectorySeparatorChar;
         Directory.CreateDirectory(outDir);
 
