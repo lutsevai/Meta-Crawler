@@ -5,8 +5,13 @@ using System;
 using System.IO;
 
 
+
+
 public class MetaCrawlerScript : MonoBehaviour
 {
+
+    delegate void fileTask(string inPath, string outPath);
+
     //public static string names = "IOTSZJL";
     enum Zoid { O, I, S, Z, J, L, T }
     enum SpeedLevelString { zero, one, two, three, four, five, six, seven, eight, nine, ten, thriteen, sixteen, nineteen, twentynine };
@@ -27,10 +32,21 @@ public class MetaCrawlerScript : MonoBehaviour
     readonly int[] speedLevels = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 16, 19, 29 };
     readonly int[] rotations = { 0, 1, 2 };
 
+    readonly int ZoidCount;
+    readonly int ActionCount;
+    readonly int HeaderCount;
+
     string outDir;
 
     // initial raw sort all reaction times, format [zoidType,level]
     List<string[]>[,] rts_raw_all;
+
+
+    List<string[]>[,] rts_raw_hypertap;
+    List<string[]>[,] rts_raw_das;
+
+    Dictionary<string, int[]> strats;
+
 
     //structure for per-subject reaction times
     Dictionary<string, List<string[]>[,]> subjectRTs;
@@ -55,6 +71,11 @@ public class MetaCrawlerScript : MonoBehaviour
         subjectRTs = new Dictionary<string, List<string[]>[,]>();
         rts_raw_all = NewLoA_Raw();
 
+        rts_raw_hypertap = NewLoA_Raw();
+        rts_raw_das = NewLoA_Raw();
+        strats = new Dictionary<string, int[]>();
+
+
         // SETTING DIRS
         outDir = newOutDir + Path.GetFileName(newInDir.TrimEnd(Path.DirectorySeparatorChar)) + Path.DirectorySeparatorChar;
         Directory.CreateDirectory(outDir);
@@ -70,11 +91,24 @@ public class MetaCrawlerScript : MonoBehaviour
             dir.Delete(true);
         }
 
+        // HYPERTAP / DAS CATEGORIZATION
+        WalkDirectoryTree(new DirectoryInfo(newInDir), isHyperTapper);
+        
+        List<string> vallls = new List<string>();
+        vallls.Add(string.Format("SID{0}DAS{0}H-TAP{0}", sep));
+        foreach (KeyValuePair<string, int[]> s in strats)
+        {
+            vallls.Add(s.Key + sep + String.Join(sep.ToString(), s.Value));
+
+        }
+        File.WriteAllLines(outDir + "strats.tsv", vallls.ToArray());
+
+
+
         // RAW DATA PROCESSING
-        WalkDirectoryTree(new DirectoryInfo(newInDir));
+        WalkDirectoryTree(new DirectoryInfo(newInDir), ExtractRtData);
 
         // DATA POSTPROCESSING & OUTPUT
-
         //per-subject
         foreach (KeyValuePair<string, List<string[]>[,]> kvp in subjectRTs)
         {
@@ -171,6 +205,8 @@ public class MetaCrawlerScript : MonoBehaviour
 
 
 
+
+
         // --------------------
         // RT Action Type
         // ---------------------
@@ -189,7 +225,6 @@ public class MetaCrawlerScript : MonoBehaviour
             //extract the column of the log containing the player action
             for (int rot = 0; rot < rts_rotlvl_all.GetLength(0); rot++)
             {
-                Debug.Log(rts_rotlvl_all[rot, speedRank].Count);
                 foreach (string[] lineSlit in rts_rotlvl_all[rot, speedRank])
                 {
                     if (!lineSlit[(int)Header.evt_data2].Equals("Pause"))
@@ -204,7 +239,7 @@ public class MetaCrawlerScript : MonoBehaviour
         // RT Action type output
         //initialize output structure of lines to be written out. +1 Length for header
         string[] actionLines = new string[Enum.GetValues(typeof(Action)).Length + 1];
-        
+
         // make header
         string rotLines_header = "" + sep;
         foreach (int i in speedLevels)
@@ -234,7 +269,7 @@ public class MetaCrawlerScript : MonoBehaviour
 
 
 
-    void WalkDirectoryTree(System.IO.DirectoryInfo root)
+    void WalkDirectoryTree(System.IO.DirectoryInfo root, fileTask processFile)
     {
         System.IO.FileInfo[] files = null;
         System.IO.DirectoryInfo[] subDirs = null;
@@ -266,9 +301,10 @@ public class MetaCrawlerScript : MonoBehaviour
                 if (fi.Extension.Equals(logExtension))
                 {
                     if (!fi.FullName.Contains("tobii-sync"))
-                        ExtractRtData(fi.FullName, Path.GetFileName(fi.FullName));
+                        processFile(fi.FullName, Path.GetFileName(fi.FullName));
                 }
 
+                //TODO:
                 // In this example, we only access the existing FileInfo object. If we
                 // want to open, delete or modify the file, then
                 // a try-catch block is required here to handle the case
@@ -282,9 +318,29 @@ public class MetaCrawlerScript : MonoBehaviour
             foreach (System.IO.DirectoryInfo dirInfo in subDirs)
             {
                 // Resursive call for each subdirectory.
-                WalkDirectoryTree(dirInfo);
+                WalkDirectoryTree(dirInfo, processFile);
             }
         }
+    }
+
+
+
+
+
+
+    string getSid(string[] lines)
+    {
+        //get SID
+        foreach (string line in lines)
+        {
+            string[] lSplit = split(line);
+
+            if (containsEvent(lSplit, "SID"))
+                return lSplit[(int)Header.evt_data1];
+            else if (containsEvent(lSplit, "GAME", "BEGIN"))
+                break;
+        }
+        return "NOSID";
     }
 
 
@@ -299,20 +355,15 @@ public class MetaCrawlerScript : MonoBehaviour
         header[0] = "RT";
         output.Add(header);
 
-        string sid = "";
+        string sid = getSid(lines);
         List<string[]>[,] rts_raw_subject;
 
 
-        //get SID & skip meta-data
+        //skip meta-data
         int startIndex = 0;
         foreach (string line in lines)
         {
             string[] lSplit = split(line);
-
-            if (containsEvent(lSplit, "SID"))
-            {
-                sid = lSplit[(int)Header.evt_data1];
-            }
 
             if (containsEvent(lSplit, "GAME", "BEGIN"))
             {
@@ -374,6 +425,7 @@ public class MetaCrawlerScript : MonoBehaviour
                 }
             }
         }
+
         string outfolder = outDir + sid + @"\";
         Directory.CreateDirectory(outfolder);
         WriteRTsToFile(outfolder + outfile, output);
@@ -637,10 +689,90 @@ public class MetaCrawlerScript : MonoBehaviour
                 return a;
             }
         }
-
-
         throw new InvalidDataException("Invalid Player Action provided for rotations: " + actionString);
     }
 
 
+    void isHyperTapper(string infile, string outfile)
+    {
+        string[] lines = File.ReadAllLines(infile);
+        string sid = getSid(lines);
+        int htaps = 0;
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            //found enough evidence, halt loop
+            if (htaps > 4)
+                break;
+
+            string[] lineSplit = lines[i].Split('\t');
+
+            if (containsEvent(lineSplit, "ZOID", "NEW"))
+            {
+                int tapLeft = 0;
+                int tapRight = 0;
+                Action lastTap = Action.Down;
+
+                // search for the first action after zoid appearance
+                for (int j = i + 1; j < lines.Length; j++)
+                {
+                    string[] lineSplit_j = lines[j].Split('\t');
+
+                    // found key down
+                    // todo: what about key up?!
+                    if (containsEvent(lineSplit_j, "PLAYER", "KEY_DOWN"))
+                    {
+                        //todo: implement pause
+                        if (lineSplit_j[(int)Header.evt_data2].Equals("Pause"))
+                            continue;
+
+                        Action a = getAction(lineSplit_j[(int)Header.evt_data2]);
+
+                        if ((!a.Equals(Action.Left)) && (!a.Equals(Action.Right)))
+                            continue;
+
+                        if (!a.Equals(lastTap))
+                        {
+                            tapLeft = 0;
+                            tapRight = 0;
+                        }
+                        lastTap = a;
+
+                        if (a.Equals(Action.Left))
+                            tapLeft++;
+                        else if (a.Equals(Action.Right))
+                            tapRight++;
+                    }
+                    // no action found for current zoid,
+                    else if (containsEvent(lineSplit_j, "ZOID", "NEW"))
+                    {
+                        // jump to the that line-1, do nothing
+                        lastTap = Action.Down;
+                        i = j - 1;
+                        break;
+                    }
+                }
+
+                if ((tapLeft > 5) || (tapRight > 5))
+                {
+                    htaps++;
+                }
+            }
+        }
+
+        int[] s;
+        if (!strats.TryGetValue(sid, out s))
+        {
+            s = new int[2];
+            strats.Add(sid, s);
+        }
+
+        if (htaps > 4)
+            s[1]++;
+        else
+            s[0]++;
+    }
+
 }
+
+
