@@ -21,6 +21,8 @@ public class MetaCrawlerScript : MonoBehaviour
 
     enum Action { Left, Right, Down, Rotate, Counterrotate };
 
+    enum PlayStyle { das, hypertap }
+
     //constants & read-onlys
 
     const char sep = '\t';
@@ -42,11 +44,9 @@ public class MetaCrawlerScript : MonoBehaviour
     List<string[]>[,] rts_raw_all;
 
 
-    List<string[]>[,] rts_raw_hypertap;
-    List<string[]>[,] rts_raw_das;
+    Dictionary<string, int[]> playstyles;
 
-    Dictionary<string, int[]> strats;
-
+    Dictionary<string, List<string>> badData;
 
     //structure for per-subject reaction times
     Dictionary<string, List<string[]>[,]> subjectRTs;
@@ -67,16 +67,15 @@ public class MetaCrawlerScript : MonoBehaviour
     /// <param name="newOutDir">Path to which all the processed data will be written to.</param>
     public void Crawl(string newInDir, string newOutDir)
     {
-        // VARIABLE INITIALIZATION
+        // INITIALIZATION
+        // ==============
         subjectRTs = new Dictionary<string, List<string[]>[,]>();
         rts_raw_all = NewLoA_Raw();
 
-        rts_raw_hypertap = NewLoA_Raw();
-        rts_raw_das = NewLoA_Raw();
-        strats = new Dictionary<string, int[]>();
+        playstyles = new Dictionary<string, int[]>();
+        badData = new Dictionary<string, List<string>>();
 
-
-        // SETTING DIRS
+        // setting directories
         outDir = newOutDir + Path.GetFileName(newInDir.TrimEnd(Path.DirectorySeparatorChar)) + Path.DirectorySeparatorChar;
         Directory.CreateDirectory(outDir);
 
@@ -92,30 +91,41 @@ public class MetaCrawlerScript : MonoBehaviour
         }
 
         // HYPERTAP / DAS CATEGORIZATION
+        // =============================
         WalkDirectoryTree(new DirectoryInfo(newInDir), isHyperTapper);
-        
-        List<string> vallls = new List<string>();
-        vallls.Add(string.Format("SID{0}DAS{0}H-TAP{0}", sep));
-        foreach (KeyValuePair<string, int[]> s in strats)
+
+        List<string> outputLines = new List<string>();
+
+        outputLines.Add(string.Format("SID{0}DAS{0}H-TAP{0}", sep));
+        foreach (KeyValuePair<string, int[]> s in playstyles)
         {
-            vallls.Add(s.Key + sep + String.Join(sep.ToString(), s.Value));
-
+            outputLines.Add(s.Key + sep + String.Join(sep.ToString(), s.Value));
         }
-        File.WriteAllLines(outDir + "strats.tsv", vallls.ToArray());
+        File.WriteAllLines(outDir + "strats.tsv", outputLines.ToArray());
 
 
-
-        // RAW DATA PROCESSING
+        // RT PROCESSING
+        // =============
+        // raw data feed in
         WalkDirectoryTree(new DirectoryInfo(newInDir), ExtractRtData);
 
-        // DATA POSTPROCESSING & OUTPUT
-        //per-subject
+        //per-subject processing
         foreach (KeyValuePair<string, List<string[]>[,]> kvp in subjectRTs)
         {
             processRT(outDir + kvp.Key + @"\", kvp.Value);
         }
         //summary of all
         processRT(outDir, rts_raw_all);
+
+
+        // BAD DATA
+        // ========
+        outputLines.Clear();
+        foreach (KeyValuePair<string, List<string>> s in badData)
+        {
+            outputLines.Add(s.Key + sep + s.Value.Count + sep + String.Join(sep.ToString(), s.Value));
+        }
+        File.WriteAllLines(outDir + "bad_data.tsv", outputLines.ToArray());
     }
 
 
@@ -202,9 +212,6 @@ public class MetaCrawlerScript : MonoBehaviour
         //Writing a summary file with all rts, categorized by rotation, and levels
         List<string> allRots_allRanksMerged = merge(allRots_allSpeedRanks.ToArray(), sep);
         File.WriteAllLines(dirPath + "allRTs_allSpeedRanks" + logExtension, allRots_allRanksMerged.ToArray());
-
-
-
 
 
         // --------------------
@@ -300,6 +307,7 @@ public class MetaCrawlerScript : MonoBehaviour
             {
                 if (fi.Extension.Equals(logExtension))
                 {
+                    // todo: more elegant check
                     if (!fi.FullName.Contains("tobii-sync"))
                         processFile(fi.FullName, Path.GetFileName(fi.FullName));
                 }
@@ -322,9 +330,6 @@ public class MetaCrawlerScript : MonoBehaviour
             }
         }
     }
-
-
-
 
 
 
@@ -356,21 +361,12 @@ public class MetaCrawlerScript : MonoBehaviour
         output.Add(header);
 
         string sid = getSid(lines);
+
+        if (!isGoodData(lines, infile))
+            return;
+
         List<string[]>[,] rts_raw_subject;
-
-
-        //skip meta-data
-        int startIndex = 0;
-        foreach (string line in lines)
-        {
-            string[] lSplit = split(line);
-
-            if (containsEvent(lSplit, "GAME", "BEGIN"))
-            {
-                break;
-            }
-            startIndex++;
-        }
+        int startIndex = GetGameStart(lines);
 
         // initialize / find subject - specific structure
         if (subjectRTs.ContainsKey(sid))
@@ -429,6 +425,25 @@ public class MetaCrawlerScript : MonoBehaviour
         string outfolder = outDir + sid + @"\";
         Directory.CreateDirectory(outfolder);
         WriteRTsToFile(outfolder + outfile, output);
+    }
+
+    private int GetGameStart(string[] lines)
+    {
+        //todo: check for no-index found
+        //skip meta-data
+        int startIndex = 0;
+        foreach (string line in lines)
+        {
+            string[] lSplit = split(line);
+
+            if (containsEvent(lSplit, "GAME", "BEGIN"))
+            {
+                break;
+            }
+            startIndex++;
+        }
+
+        return startIndex;
     }
 
 
@@ -692,17 +707,27 @@ public class MetaCrawlerScript : MonoBehaviour
         throw new InvalidDataException("Invalid Player Action provided for rotations: " + actionString);
     }
 
-
+    /// <summary>
+    /// Categorizes a data from file into play strategies: hypertapping, and das.
+    /// </summary>
+    /// <param name="infile">Path to the file that is to be analyzed.</param>
+    /// <param name="outfile">This is a dummy, present due to delegate constructions.</param>
+    // todo: get rid of the outfile
     void isHyperTapper(string infile, string outfile)
     {
+        const int htap_threshhold = 6;
+
         string[] lines = File.ReadAllLines(infile);
         string sid = getSid(lines);
         int htaps = 0;
 
+        if (!isGoodData(lines, infile))
+            return;
+
         for (int i = 0; i < lines.Length; i++)
         {
             //found enough evidence, halt loop
-            if (htaps > 4)
+            if (htaps > htap_threshhold)
                 break;
 
             string[] lineSplit = lines[i].Split('\t');
@@ -753,7 +778,7 @@ public class MetaCrawlerScript : MonoBehaviour
                     }
                 }
 
-                if ((tapLeft > 5) || (tapRight > 5))
+                if ((tapLeft > 4) || (tapRight > 4))
                 {
                     htaps++;
                 }
@@ -761,18 +786,67 @@ public class MetaCrawlerScript : MonoBehaviour
         }
 
         int[] s;
-        if (!strats.TryGetValue(sid, out s))
+        if (!playstyles.TryGetValue(sid, out s))
         {
-            s = new int[2];
-            strats.Add(sid, s);
+            s = new int[Enum.GetValues(typeof(PlayStyle)).Length];
+            playstyles.Add(sid, s);
         }
 
-        if (htaps > 4)
-            s[1]++;
+        if (htaps > htap_threshhold)
+            s[(int)PlayStyle.hypertap]++;
         else
-            s[0]++;
+            s[(int)PlayStyle.das]++;
     }
 
+    /// <summary>
+    /// Checks if a game log file is worth being analyzed
+    /// </summary>
+    /// <param name="lines">Data that is to be analyzed for its quality.</param>
+    /// <param name="infile">Name of the file the data belonged to, for logging puposes only.</param>
+    /// <returns>True if data is good, false, if it is not worth being analyzed.</returns>
+    bool isGoodData(string[] lines, string infile)
+    {
+        //initial check, in case not even header is fully present
+        if (lines.Length < 50)
+            return false;
+
+        string sid = getSid(lines);
+        if (sid.ToLower().Contains("test"))
+            return false;
+
+        int start = GetGameStart(lines);
+
+        string[] split = lines[start + 1].Split('\t');
+        int startlvl = int.Parse(split[(int)Header.level]);
+
+        int minLength = 2200;
+
+        // approximately 15 episodes
+        //todo: catch bad lvl
+        switch (startlvl)
+        {
+            case 0:
+                minLength = 2200;
+                break;
+            case 7:
+                minLength = 2100;
+                break;
+        }
+
+        if (lines.Length < minLength)
+        {
+            List<string> badFiles;
+            if (!(badData.TryGetValue(sid, out badFiles)))
+            {
+                badFiles = new List<string>();
+                badData.Add(sid, badFiles);
+            }
+            badFiles.Add(infile);
+
+            return false;
+        }
+        return true;
+    }
 }
 
 
