@@ -10,7 +10,7 @@ using System.IO;
 public class MetaCrawlerScript : MonoBehaviour
 {
 
-    delegate void fileTask(string inPath, string outPath);
+    delegate void fileTask(string inPath);
 
     //public static string names = "IOTSZJL";
     enum Zoid { O, I, S, Z, J, L, T }
@@ -24,7 +24,6 @@ public class MetaCrawlerScript : MonoBehaviour
     enum PlayStyle { das, hypertap }
 
     //constants & read-onlys
-
     const char sep = '\t';
     // total amount of possible levels in the datastructure
     const int levelCount = 30;
@@ -309,7 +308,7 @@ public class MetaCrawlerScript : MonoBehaviour
                 {
                     // todo: more elegant check
                     if (!fi.FullName.Contains("tobii-sync"))
-                        processFile(fi.FullName, Path.GetFileName(fi.FullName));
+                        processFile(fi.FullName);
                 }
 
                 //TODO:
@@ -333,36 +332,20 @@ public class MetaCrawlerScript : MonoBehaviour
 
 
 
-    string getSid(string[] lines)
+    void ExtractRtData(string inPath)
     {
-        //get SID
-        foreach (string line in lines)
-        {
-            string[] lSplit = split(line);
-
-            if (containsEvent(lSplit, "SID"))
-                return lSplit[(int)Header.evt_data1];
-            else if (containsEvent(lSplit, "GAME", "BEGIN"))
-                break;
-        }
-        return "NOSID";
-    }
-
-
-
-    void ExtractRtData(string infile, string outfile)
-    {
+        //todo: make check for good data here, extract this logic into method: bool isGoodData(string inPath, out string[] lines)
         List<string[]> output = new List<string[]>();
-        string[] lines = File.ReadAllLines(infile);
+        string[] lines = File.ReadAllLines(inPath);
 
         //adding header
-        string[] header = split(lines[0]);
+        string[] header = split(lines[0]);       
         header[0] = "RT";
         output.Add(header);
 
         string sid = getSid(lines);
 
-        if (!isGoodData(lines, infile))
+        if (!isGoodData(lines, inPath))
             return;
 
         List<string[]>[,] rts_raw_subject;
@@ -421,27 +404,58 @@ public class MetaCrawlerScript : MonoBehaviour
                 }
             }
         }
-
-        string outfolder = outDir + sid + @"\";
-        Directory.CreateDirectory(outfolder);
-        WriteRTsToFile(outfolder + outfile, output);
+        string outFile = Path.GetFileName(inPath);
+        string outDir = this.outDir + sid + @"\";
+        Directory.CreateDirectory(outDir);
+        WriteRTsToFile(outDir + outFile, output);
     }
 
+
+    /// <summary>
+    /// Finds the subject ID in passed game log data.
+    /// </summary>
+    /// <param name="lines">Log data where the subject ID has to be extracted from.</param>
+    /// <returns>string of subject ID found in the data. If no SID was found, returns "NOSID".</returns>
+    string getSid(string[] lines)
+    {
+        //get SID
+        foreach (string line in lines)
+        {
+            string[] lSplit = split(line);
+
+            if (containsEvent(lSplit, "SID"))
+                return lSplit[(int)Header.evt_data1];
+            else if (containsEvent(lSplit, "GAME", "BEGIN"))
+                break;
+        }
+        return "NOSID";
+    }
+
+
+    /// <summary>
+    /// Finds the array cell in the passed log data where the game begins.
+    /// </summary>
+    /// <param name="lines">Game log data.</param>
+    /// <returns>Array index in the passed data, where the game starts. If no game start has been found, returns -1.</returns>
     private int GetGameStart(string[] lines)
     {
-        //todo: check for no-index found
-        //skip meta-data
+        bool found = false;
         int startIndex = 0;
+
         foreach (string line in lines)
         {
             string[] lSplit = split(line);
 
             if (containsEvent(lSplit, "GAME", "BEGIN"))
             {
+                found = true;
                 break;
             }
             startIndex++;
         }
+
+        if (!found)
+            startIndex = -1;
 
         return startIndex;
     }
@@ -711,9 +725,7 @@ public class MetaCrawlerScript : MonoBehaviour
     /// Categorizes a data from file into play strategies: hypertapping, and das.
     /// </summary>
     /// <param name="infile">Path to the file that is to be analyzed.</param>
-    /// <param name="outfile">This is a dummy, present due to delegate constructions.</param>
-    // todo: get rid of the outfile
-    void isHyperTapper(string infile, string outfile)
+    void isHyperTapper(string infile)
     {
         const int htap_threshhold = 6;
 
