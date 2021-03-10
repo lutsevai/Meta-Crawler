@@ -6,21 +6,15 @@ using System.IO;
 
 
 
-
 public class MetaCrawlerScript : MonoBehaviour
 {
-
-    delegate void fileTask(string inPath);
-
     //public static string names = "IOTSZJL";
     enum Zoid { O, I, S, Z, J, L, T }
     enum SpeedLevelString { zero, one, two, three, four, five, six, seven, eight, nine, ten, thriteen, sixteen, nineteen, twentynine };
 
     //column nr:      0            1           2             3           4      5          6          7        8           9          10        11
     enum Header { timestamp, system_ticks, event_type, episode_number, level, score, lines_cleared, evt_id, evt_data1, evt_data2, curr_zoid, next_zoid };
-
     enum Action { Left, Right, Down, Rotate, Counterrotate };
-
     enum PlayStyle { das, hypertap }
 
     //constants & read-onlys
@@ -42,7 +36,6 @@ public class MetaCrawlerScript : MonoBehaviour
     // initial raw sort all reaction times, format [zoidType,level]
     List<string[]>[,] rts_raw_all;
 
-
     Dictionary<string, int[]> playstyles;
 
     Dictionary<string, List<string>> badData;
@@ -51,13 +44,11 @@ public class MetaCrawlerScript : MonoBehaviour
     Dictionary<string, List<string[]>[,]> subjectRTs;
 
 
-
     // Start is called before the first frame update
     void Start()
     {
 
     }
-
 
     /// <summary>
     /// Main method of the class - recursively searches a directroy for log files, and process them to extract various aspects of RTs into an output folder.
@@ -66,6 +57,8 @@ public class MetaCrawlerScript : MonoBehaviour
     /// <param name="newOutDir">Path to which all the processed data will be written to.</param>
     public void Crawl(string newInDir, string newOutDir)
     {
+        DirectoryCrawler dirCrawler = new DirectoryCrawler();
+
         // INITIALIZATION
         // ==============
         subjectRTs = new Dictionary<string, List<string[]>[,]>();
@@ -91,7 +84,7 @@ public class MetaCrawlerScript : MonoBehaviour
 
         // HYPERTAP / DAS CATEGORIZATION
         // =============================
-        WalkDirectoryTree(new DirectoryInfo(newInDir), isHyperTapper);
+        dirCrawler.WalkDirectoryTree(new DirectoryInfo(newInDir), isHyperTapper);
 
         List<string> outputLines = new List<string>();
 
@@ -102,11 +95,10 @@ public class MetaCrawlerScript : MonoBehaviour
         }
         File.WriteAllLines(outDir + "strats.tsv", outputLines.ToArray());
 
-
         // RT PROCESSING
         // =============
         // raw data feed in
-        WalkDirectoryTree(new DirectoryInfo(newInDir), ExtractRtData);
+        dirCrawler.WalkDirectoryTree(new DirectoryInfo(newInDir), ExtractRtData);
 
         //per-subject processing
         foreach (KeyValuePair<string, List<string[]>[,]> kvp in subjectRTs)
@@ -115,7 +107,6 @@ public class MetaCrawlerScript : MonoBehaviour
         }
         //summary of all
         processRT(outDir, rts_raw_all);
-
 
         // BAD DATA
         // ========
@@ -136,10 +127,7 @@ public class MetaCrawlerScript : MonoBehaviour
         // categorized reaction times by zoid [rotations, fall_speed] 
         List<string[]>[,] rts_rotlvl_all = NewLoA(rotations.GetLength(0), speedLevels.Length);
 
-        int[,] jakag = new int[Enum.GetValues(typeof(Action)).Length, speedLevels.Length];
-
-
-        //condense data from [zoid, lvl] data structure into [rotationNr , speedRank]
+        // condense data from [zoid, lvl] data structure into [rotationNr , speedRank]
         for (int zoidNr = 0; zoidNr < rts_raw.GetLength(0); zoidNr++)
         {
             int cRot = GetRotations(zoidNr);
@@ -175,7 +163,7 @@ public class MetaCrawlerScript : MonoBehaviour
             }
         }
 
-        // create summary datastructure of RTs for all rot-types, all levels
+        // create an output summary datastructure of RTs for all rot-types, all levels
         List<List<string>> allRots_allSpeedRanks = new List<List<string>>();
 
         //write a summary of all rts per speedstep to a single file, 3 columns
@@ -213,9 +201,9 @@ public class MetaCrawlerScript : MonoBehaviour
         File.WriteAllLines(dirPath + "allRTs_allSpeedRanks" + logExtension, allRots_allRanksMerged.ToArray());
 
 
-        // --------------------
+        // --------------
         // RT Action Type
-        // ---------------------
+        // --------------
 
         //initialize basic structure
         int[,,] rt_playerActions = new int[rotations.Length, speedLevels.Length, Enum.GetValues(typeof(Action)).Length];
@@ -275,78 +263,21 @@ public class MetaCrawlerScript : MonoBehaviour
 
 
 
-    void WalkDirectoryTree(System.IO.DirectoryInfo root, fileTask processFile)
-    {
-        System.IO.FileInfo[] files = null;
-        System.IO.DirectoryInfo[] subDirs = null;
-
-        // First, process all the files directly under this folder
-        try
-        {
-            files = root.GetFiles("*.*");
-        }
-        // This is thrown if even one of the files requires permissions greater
-        // than the application provides.
-        catch (UnauthorizedAccessException e)
-        {
-            // This code just writes out the message and continues to recurse.
-            // You may decide to do something different here. For example, you
-            // can try to elevate your privileges and access the file again.
-            Debug.Log(e.Message);
-        }
-
-        catch (System.IO.DirectoryNotFoundException e)
-        {
-            Debug.Log(e.Message);
-        }
-
-        if (files != null)
-        {
-            foreach (System.IO.FileInfo fi in files)
-            {
-                if (fi.Extension.Equals(logExtension))
-                {
-                    // todo: more elegant check
-                    if (!fi.FullName.Contains("tobii-sync"))
-                        processFile(fi.FullName);
-                }
-
-                //TODO:
-                // In this example, we only access the existing FileInfo object. If we
-                // want to open, delete or modify the file, then
-                // a try-catch block is required here to handle the case
-                // where the file has been deleted since the call to TraverseTree().
-                //Debug.Log(fi.FullName);
-            }
-
-            // Now find all the subdirectories under this directory.
-            subDirs = root.GetDirectories();
-
-            foreach (System.IO.DirectoryInfo dirInfo in subDirs)
-            {
-                // Resursive call for each subdirectory.
-                WalkDirectoryTree(dirInfo, processFile);
-            }
-        }
-    }
-
-
-
     void ExtractRtData(string inPath)
     {
         //todo: make check for good data here, extract this logic into method: bool isGoodData(string inPath, out string[] lines)
         List<string[]> output = new List<string[]>();
-        string[] lines = File.ReadAllLines(inPath);
+        string[] lines;
+
+        if (!hasGoodData(inPath, out lines))
+            return;
 
         //adding header
-        string[] header = split(lines[0]);       
+        string[] header = split(lines[0]);
         header[0] = "RT";
         output.Add(header);
 
         string sid = getSid(lines);
-
-        if (!isGoodData(lines, inPath))
-            return;
 
         List<string[]>[,] rts_raw_subject;
         int startIndex = GetGameStart(lines);
@@ -382,7 +313,7 @@ public class MetaCrawlerScript : MonoBehaviour
                         if (!lineSplit_j[(int)Header.timestamp].Equals(lineSplit[0]))
                         {
                             float diff = float.Parse(lineSplit_j[(int)Header.timestamp]) - float.Parse(lineSplit[0]);
-                            lineSplit_j[0] = Math.Round((Decimal)diff, 5, MidpointRounding.AwayFromZero).ToString();
+                            lineSplit_j[0] = diff.ToString();
 
                             Zoid thisZoid = GetZoidType(lineSplit_j[(int)Header.curr_zoid]);
                             int level = int.Parse(lineSplit_j[(int)Header.level]);
@@ -729,12 +660,12 @@ public class MetaCrawlerScript : MonoBehaviour
     {
         const int htap_threshhold = 6;
 
-        string[] lines = File.ReadAllLines(infile);
+        string[] lines;
+        if (!hasGoodData(infile, out lines))
+            return;
+
         string sid = getSid(lines);
         int htaps = 0;
-
-        if (!isGoodData(lines, infile))
-            return;
 
         for (int i = 0; i < lines.Length; i++)
         {
@@ -810,14 +741,23 @@ public class MetaCrawlerScript : MonoBehaviour
             s[(int)PlayStyle.das]++;
     }
 
+
     /// <summary>
-    /// Checks if a game log file is worth being analyzed
+    /// Checks if a game log file is worth being analyzed.
     /// </summary>
-    /// <param name="lines">Data that is to be analyzed for its quality.</param>
-    /// <param name="infile">Name of the file the data belonged to, for logging puposes only.</param>
-    /// <returns>True if data is good, false, if it is not worth being analyzed.</returns>
-    bool isGoodData(string[] lines, string infile)
-    {
+    /// <param name="infile">Path to the file to be checked.</param>
+    /// <param name="lines">Out array containing the data, if it turns out good. Otherwise, returns an empty array.</param>
+    /// <returns>True if data worth being analyzed, and false, if not.</returns>
+    bool hasGoodData(string infile, out string[] lines)
+    {    
+        if ((!Path.GetExtension(infile).Equals(logExtension)) || (Path.GetFileNameWithoutExtension(infile).Contains("tobii-sync")))
+        {
+            lines = new string[0];
+            return false;
+        }
+
+        lines = File.ReadAllLines(infile);
+
         //initial check, in case not even header is fully present
         if (lines.Length < 50)
             return false;
