@@ -6,6 +6,22 @@ using System.IO;
 
 
 
+public struct RT
+{
+    public RT(float newVal, string[] newMetadata)
+    {
+        val = newVal;
+        metaData = newMetadata;
+    }
+
+    public double val { get; }
+    public string[] metaData { get; }
+
+    public override string ToString() => $"({val.ToString()}, {metaData.ToString()})";
+}
+
+
+
 public class MetaCrawlerScript : MonoBehaviour
 {
     //public static string names = "IOTSZJL";
@@ -34,14 +50,15 @@ public class MetaCrawlerScript : MonoBehaviour
     string outDir;
 
     // initial raw sort all reaction times, format [zoidType,level]
-    List<string[]>[,] rts_raw_all;
+    List<RT>[,] rts_raw_all;
+
+    //structure for per-subject reaction times
+    Dictionary<string, List<RT>[,]> subjectRTs;
 
     Dictionary<string, int[]> playstyles;
 
+    // log of bad data, that could not be used
     Dictionary<string, List<string>> badData;
-
-    //structure for per-subject reaction times
-    Dictionary<string, List<string[]>[,]> subjectRTs;
 
 
     // Start is called before the first frame update
@@ -61,7 +78,7 @@ public class MetaCrawlerScript : MonoBehaviour
 
         // INITIALIZATION
         // ==============
-        subjectRTs = new Dictionary<string, List<string[]>[,]>();
+        subjectRTs = new Dictionary<string, List<RT>[,]>();
         rts_raw_all = NewLoA_Raw();
 
         playstyles = new Dictionary<string, int[]>();
@@ -101,7 +118,7 @@ public class MetaCrawlerScript : MonoBehaviour
         dirCrawler.WalkDirectoryTree(new DirectoryInfo(newInDir), ExtractRtData);
 
         //per-subject processing
-        foreach (KeyValuePair<string, List<string[]>[,]> kvp in subjectRTs)
+        foreach (KeyValuePair<string, List<RT>[,]> kvp in subjectRTs)
         {
             processRT(outDir + kvp.Key + @"\", kvp.Value);
         }
@@ -120,12 +137,12 @@ public class MetaCrawlerScript : MonoBehaviour
 
 
 
-    void processRT(string dirPath, List<string[]>[,] rts_raw)
+    void processRT(string dirPath, List<RT>[,] rts_raw)
     {
         Directory.CreateDirectory(dirPath);
 
         // categorized reaction times by zoid [rotations, fall_speed] 
-        List<string[]>[,] rts_rotlvl_all = NewLoA(rotations.GetLength(0), speedLevels.Length);
+        List<RT>[,] rts_rotlvl_all = NewLoA(rotations.GetLength(0), speedLevels.Length);
 
         // condense data from [zoid, lvl] data structure into [rotationNr , speedRank]
         for (int zoidNr = 0; zoidNr < rts_raw.GetLength(0); zoidNr++)
@@ -164,28 +181,28 @@ public class MetaCrawlerScript : MonoBehaviour
         }
 
         // create an output summary datastructure of RTs for all rot-types, all levels
-        List<List<string>> allRots_allSpeedRanks = new List<List<string>>();
+        List<List<RT>> allRots_allSpeedRanks = new List<List<RT>>();
 
         //write a summary of all rts per speedstep to a single file, 3 columns
         for (int speedRank = 0; speedRank < rts_rotlvl_all.GetLength(1); speedRank++)
         {
-            List<string>[] listRots = new List<string>[rotations.Length];
+            List<RT>[] listRots = new List<RT>[rotations.Length];
             for (int i = 0; i < listRots.Length; i++)
             {
-                listRots[i] = new List<string>();
+                listRots[i] = new List<RT>();
             }
 
             //extract the first column of the log containing the timestamp
             for (int rot = 0; rot < rts_rotlvl_all.GetLength(0); rot++)
             {
-                foreach (string[] lineSlit in rts_rotlvl_all[rot, speedRank])
+                foreach (RT lineSlit in rts_rotlvl_all[rot, speedRank])
                 {
-                    listRots[rot].Add(lineSlit[(int)Header.timestamp]);
+                    listRots[rot].Add(lineSlit);
                 }
             }
 
             // add all extracted RTs to the general rots list
-            foreach (List<string> list in listRots)
+            foreach (List<RT> list in listRots)
             {
                 allRots_allSpeedRanks.Add(list);
             }
@@ -219,11 +236,11 @@ public class MetaCrawlerScript : MonoBehaviour
             //extract the column of the log containing the player action
             for (int rot = 0; rot < rts_rotlvl_all.GetLength(0); rot++)
             {
-                foreach (string[] lineSlit in rts_rotlvl_all[rot, speedRank])
+                foreach (RT lineSlit in rts_rotlvl_all[rot, speedRank])
                 {
-                    if (!lineSlit[(int)Header.evt_data2].Equals("Pause"))
+                    if (!lineSlit.metaData[(int)Header.evt_data2].Equals("Pause"))
                     {
-                        Action p = getAction(lineSlit[(int)Header.evt_data2]);
+                        Action p = getAction(lineSlit.metaData[(int)Header.evt_data2]);
                         rt_playerActions[rot, speedRank, (int)p] += 1;
                     }
                 }
@@ -266,20 +283,15 @@ public class MetaCrawlerScript : MonoBehaviour
     void ExtractRtData(string inPath)
     {
         //todo: make check for good data here, extract this logic into method: bool isGoodData(string inPath, out string[] lines)
-        List<string[]> output = new List<string[]>();
+        List<RT> output = new List<RT>();
         string[] lines;
 
         if (!hasGoodData(inPath, out lines))
             return;
 
-        //adding header
-        string[] header = split(lines[0]);
-        header[0] = "RT";
-        output.Add(header);
-
         string sid = getSid(lines);
 
-        List<string[]>[,] rts_raw_subject;
+        List<RT>[,] rts_raw_subject;
         int startIndex = GetGameStart(lines);
 
         // initialize / find subject - specific structure
@@ -313,13 +325,16 @@ public class MetaCrawlerScript : MonoBehaviour
                         if (!lineSplit_j[(int)Header.timestamp].Equals(lineSplit[0]))
                         {
                             float diff = float.Parse(lineSplit_j[(int)Header.timestamp]) - float.Parse(lineSplit[0]);
+ 
+                            //TODO: careful, as sometimes the string from the metadata is being used. Make universal
                             lineSplit_j[0] = diff.ToString();
+                            RT r = new RT(diff, lineSplit_j);
 
                             Zoid thisZoid = GetZoidType(lineSplit_j[(int)Header.curr_zoid]);
                             int level = int.Parse(lineSplit_j[(int)Header.level]);
-                            rts_raw_all[(int)thisZoid, level].Add(lineSplit_j);
-                            rts_raw_subject[(int)thisZoid, level].Add(lineSplit_j);
-                            output.Add(lineSplit_j);
+                            rts_raw_all[(int)thisZoid, level].Add(r);
+                            rts_raw_subject[(int)thisZoid, level].Add(r);
+                            output.Add(r);
                             break;
                         }
                         i = j;
@@ -397,13 +412,13 @@ public class MetaCrawlerScript : MonoBehaviour
     /// </summary>
     /// <param name="path">File to which the data has to be written to.</param>
     /// <param name="rtData">Data that has to be written out.</param>
-    void WriteRTsToFile(string path, List<string[]> rtData)
+    void WriteRTsToFile(string path, List<RT> rtData)
     {
         // convert collected values to string array
         string[] outlines = new string[rtData.Count];
         for (int i = 0; i < outlines.Length; i++)
         {
-            outlines[i] = string.Join("\t", rtData[i]);
+            outlines[i] = string.Join("\t", rtData[i].metaData);
         }
         // write the result to file
         File.WriteAllLines(path, outlines);
@@ -446,6 +461,40 @@ public class MetaCrawlerScript : MonoBehaviour
     }
 
 
+    List<string> merge(List<RT>[] listarray, char sep)
+    {
+        List<string> result = new List<string>();
+
+        //determening the longest list
+        int max = 0;
+        foreach (List<RT> list in listarray)
+        {
+            if (list.Count > max)
+            {
+                max = list.Count;
+            }
+        }
+
+        //merging the elements of the list
+        for (int i = 0; i < max; i++)
+        {
+            string line = "";
+            foreach (List<RT> list in listarray)
+            {
+                line += getElem(list, i) + sep;
+            }
+            //trims out the last sep-char, and adds to the results
+            result.Add(line.Remove(line.Length - 1));
+        }
+
+        return result;
+    }
+
+
+
+
+
+
     /// <summary>
     /// Fetches an element from a string list by its ordianl position in the list, or returns an empty string, if the position exceeds the size of the list.
     /// </summary>
@@ -463,6 +512,21 @@ public class MetaCrawlerScript : MonoBehaviour
             return "";
         }
     }
+
+
+    string getElem(List<RT> list, int i)
+    {
+        if (i < list.Count)
+        {
+            return list[i].metaData[(int)Header.timestamp];
+        }
+        else
+        {
+            return "";
+        }
+    }
+
+
 
 
     /// <summary>
@@ -612,7 +676,7 @@ public class MetaCrawlerScript : MonoBehaviour
     /// Wrapper method for NewLoa. Used to create a 2dimensional array of lists for the rt raw data format [zoidType,levelCount].
     /// </summary>
     /// <returns>Fully initialized 2-dimensional array of lists [zoidType,levelCount].</returns>
-    List<string[]>[,] NewLoA_Raw()
+    List<RT>[,] NewLoA_Raw()
     {
         return NewLoA(Enum.GetNames(typeof(Zoid)).Length, levelCount);
     }
@@ -624,15 +688,15 @@ public class MetaCrawlerScript : MonoBehaviour
     /// <param name="x_length">Size of the 1st dimension of the array to be created.</param>
     /// <param name="y_length">Size of the 2nd dimension of the array to be created.</param>
     /// <returns>Fully initialized 2-dimensional array of lists.</returns>
-    List<string[]>[,] NewLoA(int x_length, int y_length)
+    List<RT>[,] NewLoA(int x_length, int y_length)
     {
-        List<string[]>[,] newStruct = new List<string[]>[x_length, y_length];
+        List<RT>[,] newStruct = new List<RT>[x_length, y_length];
         // initialize individual structures inside the big one 
         for (int i = 0; i < newStruct.GetLength(0); i++)
         {
             for (int j = 0; j < newStruct.GetLength(1); j++)
             {
-                newStruct[i, j] = new List<string[]>();
+                newStruct[i, j] = new List<RT>();
             }
         }
         return newStruct;
