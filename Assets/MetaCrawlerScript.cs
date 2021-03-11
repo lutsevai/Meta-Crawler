@@ -52,6 +52,8 @@ public class MetaCrawlerScript : MonoBehaviour
     // initial raw sort all reaction times, format [zoidType,level]
     List<RT>[,] rts_raw_all;
 
+    List<string>[,] rts_avg_speedrot;
+
     //structure for per-subject reaction times
     Dictionary<string, List<RT>[,]> subjectRTs;
 
@@ -80,6 +82,7 @@ public class MetaCrawlerScript : MonoBehaviour
         // ==============
         subjectRTs = new Dictionary<string, List<RT>[,]>();
         rts_raw_all = NewLoA_Raw();
+        rts_avg_speedrot = NewLoA_string(rotations.Length, speedLevels.Length);
 
         playstyles = new Dictionary<string, int[]>();
         badData = new Dictionary<string, List<string>>();
@@ -124,6 +127,25 @@ public class MetaCrawlerScript : MonoBehaviour
         }
         //summary of all
         processRT(outDir, rts_raw_all);
+
+
+
+
+        // COMBINED AVERAGE RTS
+        List<string>[] out_means = new List<string>[rotations.Length * speedLevels.Length];
+        // calculate averages, add them to the according structure
+        for (int speedLvl = 0; speedLvl < rts_avg_speedrot.GetLength(1); speedLvl++)
+        {
+            for (int rot = 0; rot < rts_avg_speedrot.GetLength(0); rot++)
+            {
+                out_means[speedLvl * rotations.Length + rot] = rts_avg_speedrot[rot, speedLvl];
+            }
+        }
+        List<string> merged = merge(out_means, sep);
+        File.WriteAllLines(outDir + "allRTs_allSpeedRanks_avg" + logExtension, merged.ToArray());
+
+
+
 
         // BAD DATA
         // ========
@@ -216,6 +238,28 @@ public class MetaCrawlerScript : MonoBehaviour
         //Writing a summary file with all rts, categorized by rotation, and levels
         List<string> allRots_allRanksMerged = merge(allRots_allSpeedRanks.ToArray(), sep);
         File.WriteAllLines(dirPath + "allRTs_allSpeedRanks" + logExtension, allRots_allRanksMerged.ToArray());
+
+
+
+        // AVERAGES
+        // --------
+        // calculate averages, add them to the according structure
+        for (int speedLvl = 0; speedLvl < rts_rotlvl_all.GetLength(1); speedLvl++)
+        {
+            for (int rot = 0; rot < rts_rotlvl_all.GetLength(0); rot++)
+            {
+                if (rts_rotlvl_all[rot, speedLvl].Count > 0)
+                {
+                    double total = 0;
+                    foreach (RT r in rts_rotlvl_all[rot, speedLvl])
+                    {
+                        total += r.val;
+                    }
+                    double avg = total / rts_rotlvl_all[rot, speedLvl].Count;
+                    rts_avg_speedrot[rot, speedLvl].Add(avg.ToString());
+                }
+            }
+        }
 
 
         // --------------
@@ -325,7 +369,7 @@ public class MetaCrawlerScript : MonoBehaviour
                         if (!lineSplit_j[(int)Header.timestamp].Equals(lineSplit[0]))
                         {
                             float diff = float.Parse(lineSplit_j[(int)Header.timestamp]) - float.Parse(lineSplit[0]);
- 
+
                             //TODO: careful, as sometimes the string from the metadata is being used. Make universal
                             lineSplit_j[0] = diff.ToString();
                             RT r = new RT(diff, lineSplit_j);
@@ -703,6 +747,35 @@ public class MetaCrawlerScript : MonoBehaviour
     }
 
 
+    List<double>[,] NewLoA_double(int x_length, int y_length)
+    {
+        List<double>[,] newStruct = new List<double>[x_length, y_length];
+        // initialize individual structures inside the big one 
+        for (int i = 0; i < newStruct.GetLength(0); i++)
+        {
+            for (int j = 0; j < newStruct.GetLength(1); j++)
+            {
+                newStruct[i, j] = new List<double>();
+            }
+        }
+        return newStruct;
+    }
+
+    List<string>[,] NewLoA_string(int x_length, int y_length)
+    {
+        List<string>[,] newStruct = new List<string>[x_length, y_length];
+        // initialize individual structures inside the big one 
+        for (int i = 0; i < newStruct.GetLength(0); i++)
+        {
+            for (int j = 0; j < newStruct.GetLength(1); j++)
+            {
+                newStruct[i, j] = new List<string>();
+            }
+        }
+        return newStruct;
+    }
+
+
 
     Action getAction(string actionString)
     {
@@ -813,7 +886,7 @@ public class MetaCrawlerScript : MonoBehaviour
     /// <param name="lines">Out array containing the data, if it turns out good. Otherwise, returns an empty array.</param>
     /// <returns>True if data worth being analyzed, and false, if not.</returns>
     bool hasGoodData(string infile, out string[] lines)
-    {    
+    {
         if ((!Path.GetExtension(infile).Equals(logExtension)) || (Path.GetFileNameWithoutExtension(infile).Contains("tobii-sync")))
         {
             lines = new string[0];
