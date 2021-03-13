@@ -7,7 +7,6 @@ public class MainCanvasScript : MonoBehaviour
 {
     public InputField inDirField;
     public InputField outDirField;
-    public GameObject metaCrawl;
 
     const string outDir_standard = @"D:\documents\data\meta-two\rt\";
 
@@ -25,7 +24,7 @@ public class MainCanvasScript : MonoBehaviour
 
     public void GoButtonClick()
     {
-        MetaCrawlerScript meta = metaCrawl.GetComponent<MetaCrawlerScript>();
+        MetaCrawlerScript meta = new MetaCrawlerScript();
         meta.Crawl(inDirField.text, outDirField.text);
     }
 }
