@@ -63,6 +63,10 @@ public class MetaCrawlerScript : MonoBehaviour
     Dictionary<string, List<string>> badData;
 
 
+
+    Dictionary<string, double> meanRt_registry;
+    Dictionary<string, double> meanRt_registry_o;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -86,7 +90,8 @@ public class MetaCrawlerScript : MonoBehaviour
 
         playstyles = new Dictionary<string, int[]>();
         badData = new Dictionary<string, List<string>>();
-
+        meanRt_registry = new Dictionary<string, double>();
+        meanRt_registry_o = new Dictionary<string, double>();
         // setting directories
         outDir = newOutDir + Path.GetFileName(newInDir.TrimEnd(Path.DirectorySeparatorChar)) + Path.DirectorySeparatorChar;
         Directory.CreateDirectory(outDir);
@@ -129,8 +134,6 @@ public class MetaCrawlerScript : MonoBehaviour
         processRT(outDir, rts_raw_all);
 
 
-
-
         // COMBINED AVERAGE RTS
         List<string>[] out_means = new List<string>[rotations.Length * speedLevels.Length];
         // calculate averages, add them to the according structure
@@ -144,6 +147,22 @@ public class MetaCrawlerScript : MonoBehaviour
         List<string> merged = merge(out_means, sep);
         File.WriteAllLines(outDir + "allRTs_allSpeedRanks_avg" + logExtension, merged.ToArray());
 
+
+        outputLines.Clear();
+        // AVG Registry
+        foreach (KeyValuePair<string, double> s in meanRt_registry)
+        {
+            outputLines.Add(s.Key + sep + s.Value);
+        }
+        File.WriteAllLines(outDir + "meanrt_registry.tsv", outputLines.ToArray());
+
+        outputLines.Clear();
+        // AVG Registry
+        foreach (KeyValuePair<string, double> s in meanRt_registry_o)
+        {
+            outputLines.Add(s.Key + sep + s.Value);
+        }
+        File.WriteAllLines(outDir + "meanrt_registry_o.tsv", outputLines.ToArray());
 
 
 
@@ -244,6 +263,11 @@ public class MetaCrawlerScript : MonoBehaviour
         // AVERAGES
         // --------
         // calculate averages, add them to the according structure
+        double total_all = 0;
+        long total_count = 0;
+
+        double total_all_o = 0;
+        long total_count_o = 0;
         for (int speedLvl = 0; speedLvl < rts_rotlvl_all.GetLength(1); speedLvl++)
         {
             for (int rot = 0; rot < rts_rotlvl_all.GetLength(0); rot++)
@@ -254,13 +278,26 @@ public class MetaCrawlerScript : MonoBehaviour
                     foreach (RT r in rts_rotlvl_all[rot, speedLvl])
                     {
                         total += r.val;
+                       ;
                     }
+                    total_all += total;
+                    total_count += rts_rotlvl_all[rot, speedLvl].Count;
+
+                    if (rot == 0)
+                    {
+                        total_all_o += total;
+                        total_count_o+= rts_rotlvl_all[rot, speedLvl].Count;
+                    }
+
                     double avg = total / rts_rotlvl_all[rot, speedLvl].Count;
                     rts_avg_speedrot[rot, speedLvl].Add(avg.ToString());
                 }
             }
         }
 
+        string cSid = Path.GetFullPath(dirPath).TrimEnd(Path.DirectorySeparatorChar);
+        meanRt_registry.Add(Path.GetFileName(cSid), total_all / total_count);
+        meanRt_registry_o.Add(Path.GetFileName(cSid), total_all_o / total_count_o);
 
         // --------------
         // RT Action Type
@@ -282,7 +319,7 @@ public class MetaCrawlerScript : MonoBehaviour
             {
                 foreach (RT lineSlit in rts_rotlvl_all[rot, speedRank])
                 {
-                    if (!lineSlit.metaData[(int)Header.evt_data2].Equals("Pause"))
+                    if (isValidAction(lineSlit.metaData[(int)Header.evt_data2]))
                     {
                         Action p = getAction(lineSlit.metaData[(int)Header.evt_data2]);
                         rt_playerActions[rot, speedRank, (int)p] += 1;
@@ -290,6 +327,8 @@ public class MetaCrawlerScript : MonoBehaviour
                 }
             }
         }
+
+
 
         // RT Action type output
         //initialize output structure of lines to be written out. +1 Length for header
@@ -303,6 +342,7 @@ public class MetaCrawlerScript : MonoBehaviour
             {
                 rotLines_header += r.ToString() + sep;
             }
+            rotLines_header += sep;
         }
         actionLines[0] = rotLines_header;
 
@@ -316,6 +356,8 @@ public class MetaCrawlerScript : MonoBehaviour
                 {
                     line += rt_playerActions[rot, speedRank, (int)act].ToString() + sep;
                 }
+                // leave space inbetween levels
+                line += sep;
             }
             actionLines[(int)act + 1] = line;
         }
@@ -777,6 +819,18 @@ public class MetaCrawlerScript : MonoBehaviour
 
 
 
+    bool isValidAction(string actionString)
+    {
+        foreach (Action a in Enum.GetValues(typeof(Action)))
+        {
+            if (a.ToString().Equals(actionString))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     Action getAction(string actionString)
     {
         foreach (Action a in Enum.GetValues(typeof(Action)))
@@ -828,7 +882,7 @@ public class MetaCrawlerScript : MonoBehaviour
                     if (containsEvent(lineSplit_j, "PLAYER", "KEY_DOWN"))
                     {
                         //todo: implement pause
-                        if (lineSplit_j[(int)Header.evt_data2].Equals("Pause"))
+                        if (!isValidAction(lineSplit_j[(int)Header.evt_data2]))
                             continue;
 
                         Action a = getAction(lineSplit_j[(int)Header.evt_data2]);
