@@ -24,7 +24,7 @@ public class MainCanvasScript : MonoBehaviour
 
     public void GoButtonClick()
     {
-        MetaCrawlerScript meta = new MetaCrawlerScript();
+        MetaCrawler meta = new MetaCrawler();
         meta.Crawl(inDirField.text, outDirField.text);
     }
 }
