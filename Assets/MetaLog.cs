@@ -8,6 +8,8 @@ using System.IO;
 //column nr:      0            1           2             3           4      5          6          7        8           9          10        11
 public enum Header { timestamp, system_ticks, event_type, episode_number, level, score, lines_cleared, evt_id, evt_data1, evt_data2, curr_zoid, next_zoid };
 
+
+
 public static class MetaLog
 {
     public const string logExtension = ".tsv";
@@ -84,9 +86,17 @@ public static class MetaLog
         if (sid.ToLower().Contains("test"))
             return false;
 
+        //todo: temporary here, should remove it 
+        //string[] endline = MetaLog.split(lines[lines.Length - 1]);
+        //int endlvl = int.Parse(endline[(int)Header.level]);
+
+        //if (endlvl > 8) 
+        //    return false;
+
+
         int start = MetaLog.GetGameStart(lines);
 
-        string[] split = lines[start + 1].Split('\t');
+        string[] split = MetaLog.split(lines[start + 1]);
         int startlvl = int.Parse(split[(int)Header.level]);
 
         int minLength = 2200;

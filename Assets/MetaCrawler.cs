@@ -128,7 +128,7 @@ public class MetaCrawler
 
         // HYPERTAP / DAS CATEGORIZATION
         // =============================
-        dirCrawler.WalkDirectoryTree(new DirectoryInfo(newInDir), detectStrategy);
+        dirCrawler.WalkDirectoryTree(new DirectoryInfo(newInDir), processStrategy);
 
         outputLines.Clear();
         outputLines.Add(string.Format("SID{0}DAS{0}H-TAP{0}", sep));
@@ -141,12 +141,8 @@ public class MetaCrawler
 
 
 
-
-
-
     List<RT>[,] condenseToSpeedRotArray(List<RT>[,] rts_raw)
     {
-
         List<RT>[,] current_rt_rotlvl = NewLoA(MetaTypes.rotations.Length, MetaTypes.speedLevels.Length);
 
         // condense data from [zoid, lvl] data structure into [rotationNr , speedRank]
@@ -172,7 +168,6 @@ public class MetaCrawler
     {
         Directory.CreateDirectory(dirPath);
 
-
         // write RT to separate files for each lvl, and zoid type
         for (int zoid = 0; zoid < rts_raw.GetLength(0); zoid++)
         {
@@ -186,7 +181,6 @@ public class MetaCrawler
 
         // categorized reaction times by zoid [rotations, fall_speed] 
         List<RT>[,] current_rt_rotlvl = condenseToSpeedRotArray(rts_raw);
-
 
 
         // write RT to separate files for each speedstep, and rotation type
@@ -338,7 +332,7 @@ public class MetaCrawler
 
 
 
-    void detectStrategy(string infile)
+    void processStrategy(string infile)
     {
         string[] lines;
         if (!MetaLog.hasGoodData(infile, out lines))
@@ -359,6 +353,7 @@ public class MetaCrawler
 
 
 
+    //todo: extract method to MetaLog
     void ExtractRt(string inPath)
     {
         List<RT> output = new List<RT>();
