@@ -20,16 +20,42 @@ public struct RT
 }
 
 
+public struct RTStats
+{
+    public RTStats(int newGood, int newBelow, int newAbove)
+    {
+        good_count = newGood;
+        belowMin_count = newBelow;
+        aboveMax_count = newAbove;
+
+    }
+
+    public int good_count { get; }
+    public int belowMin_count { get; }
+    public int aboveMax_count { get; }
+
+    public int getTotalRT()
+    {
+        return good_count + belowMin_count + aboveMax_count;
+    }
+
+    public override string ToString() => $"({good_count.ToString()}, {belowMin_count.ToString()}, {aboveMax_count.ToString()})";
+}
+
+
 
 
 public static class Data 
 {
+    public static float rt_cutoff_min = .1f;
+    public static float rt_cutoff_max = 1.5f;
+
      /// <summary>
-    /// Fetches an element from a string list by its ordianl position in the list, or returns an empty string, if the position exceeds the size of the list.
-    /// </summary>
-    /// <param name="list">String list, from which the string is to be fetched.</param>
-    /// <param name="i">Position of the string in the list.</param>
-    /// <returns>String at the ith position, or an empty string, if the position exceeds the size of the list.</returns>
+     /// Fetches an element from a string list by its ordianl position in the list, or returns an empty string, if the position exceeds the size of the list.
+     /// </summary>
+     /// <param name="list">String list, from which the string is to be fetched.</param>
+     /// <param name="i">Position of the string in the list.</param>
+     /// <returns>String at the ith position, or an empty string, if the position exceeds the size of the list.</returns>
     public static string getElem(List<string> list, int i)
     {
         if (i < list.Count)

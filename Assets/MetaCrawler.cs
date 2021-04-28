@@ -34,7 +34,9 @@ public class MetaCrawler
     Dictionary<string, int[]> subj_strats;
 
     // discarded data [sid > filenames of bad logs]
-    Dictionary<string, List<string>> subj_badData;
+    Dictionary<string, List<string>> subj_badLogs;
+
+    Dictionary<string, RTStats> subj_rtStats;
 
 
 
@@ -53,7 +55,8 @@ public class MetaCrawler
         subj_meanRt = new Dictionary<string, double>();
         subj_meanRt_o = new Dictionary<string, double>();
         subj_strats = new Dictionary<string, int[]>();
-        subj_badData = new Dictionary<string, List<string>>();
+        subj_badLogs = new Dictionary<string, List<string>>();
+        subj_rtStats = new Dictionary<string, RTStats>();
         DirectoryCrawler dirCrawler = new DirectoryCrawler();
 
         // setting directories
@@ -81,7 +84,7 @@ public class MetaCrawler
         //per-subject
         foreach (KeyValuePair<string, List<RT>[,]> kvp in subj_rt_zoidlvl)
         {
-            processRT(outDir + kvp.Key + @"\", kvp.Value);
+            processRT(outDir + kvp.Key + @"\", kvp.Value, kvp.Key);
         }
 
 
@@ -117,13 +120,26 @@ public class MetaCrawler
         }
         File.WriteAllLines(outDir + "subjects_rt_mean_o.tsv", outputLines.ToArray());
 
-        // bad data
+        // bad logs
         outputLines.Clear();
-        foreach (KeyValuePair<string, List<string>> s in subj_badData)
+        foreach (KeyValuePair<string, List<string>> s in subj_badLogs)
         {
             outputLines.Add(s.Key + sep + s.Value.Count + sep + String.Join(sep.ToString(), s.Value));
         }
         File.WriteAllLines(outDir + "subjects_badData.tsv", outputLines.ToArray());
+
+
+        // bad rt data, good rt data
+        outputLines.Clear();
+        outputLines.Add("SID" + sep + "good_count" + sep + "belowMin_count" + sep + "belowMin_percent" + sep + "aboveMax_count" + sep + "aboveMax_percent");
+        foreach (KeyValuePair<string, RTStats> s in subj_rtStats)
+        {
+            float belowPercent = (float)s.Value.belowMin_count / (float)(s.Value.getTotalRT()) * 100;
+            float abovePercent = (float)s.Value.aboveMax_count / (float)(s.Value.getTotalRT()) * 100;
+            outputLines.Add(s.Key + sep + s.Value.good_count.ToString() + sep + s.Value.belowMin_count.ToString() + sep + string.Format("{0:N2}", belowPercent) + sep + s.Value.aboveMax_count.ToString() + sep + string.Format("{0:N2}", abovePercent));
+        }
+        File.WriteAllLines(outDir + "subjects_rtStats.tsv", outputLines.ToArray());
+
 
 
         // HYPERTAP / DAS CATEGORIZATION
@@ -164,9 +180,50 @@ public class MetaCrawler
 
 
 
-    void processRT(string dirPath, List<RT>[,] rts_raw)
+    void processRT(string dirPath, List<RT>[,] rts_raw, string cSid)
     {
         Directory.CreateDirectory(dirPath);
+
+        int belowMinRt = 0;
+        int goodRt = 0;
+        int aboveMaxRt = 0;
+        List<RT> badList = new List<RT>();
+
+        for (int zoid = 0; zoid < rts_raw.GetLength(0); zoid++)
+        {
+            for (int level = 0; level < rts_raw.GetLength(1); level++)
+            {
+                badList.Clear();
+                foreach (RT rt in rts_raw[zoid, level])
+                {
+                    if (rt.val < Data.rt_cutoff_min)
+                    {
+                        belowMinRt++;
+                        badList.Add(rt);
+                    }
+                    else if (rt.val > Data.rt_cutoff_max)
+                    {
+                        aboveMaxRt++;
+                        badList.Add(rt);
+                    } else
+                    {
+                        goodRt++;
+                    }
+                }
+
+                foreach (RT rt in badList)
+                {
+                    rts_raw[zoid, level].Remove(rt);
+                }
+
+            }
+        }
+
+        subj_rtStats.Add(cSid, new RTStats(goodRt, belowMinRt, aboveMaxRt));
+
+        string[] outlier_lines = new string[] { "goodRT" + sep + goodRt.ToString(), "belowMinRT" + sep + belowMinRt.ToString(), "aboveMaxRT" + sep + aboveMaxRt.ToString() };
+        File.WriteAllLines(dirPath + "rt_outliers" + MetaLog.logExtension, outlier_lines);
+
 
         // write RT to separate files for each lvl, and zoid type
         for (int zoid = 0; zoid < rts_raw.GetLength(0); zoid++)
@@ -263,7 +320,6 @@ public class MetaCrawler
             }
         }
 
-        string cSid = Path.GetFullPath(dirPath).TrimEnd(Path.DirectorySeparatorChar);
         subj_meanRt.Add(Path.GetFileName(cSid), total_all / total_count);
         subj_meanRt_o.Add(Path.GetFileName(cSid), total_all_o / total_count_o);
 
@@ -367,10 +423,10 @@ public class MetaCrawler
         {
             string badSid = MetaLog.getSid(lines);
             List<string> badFiles;
-            if (!(subj_badData.TryGetValue(badSid, out badFiles)))
+            if (!(subj_badLogs.TryGetValue(badSid, out badFiles)))
             {
                 badFiles = new List<string>();
-                subj_badData.Add(badSid, badFiles);
+                subj_badLogs.Add(badSid, badFiles);
             }
             badFiles.Add(inPath);
             return;
@@ -473,8 +529,8 @@ public class MetaCrawler
     {
         return NewLoA(Enum.GetNames(typeof(Zoid)).Length, MetaTypes.levels.Length);
     }
-   
-    
+
+
     /// <summary>
     /// Initializes a 2-dimensional array of lists, and initiates each node with an empty list.
     /// </summary>
