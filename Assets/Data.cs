@@ -48,7 +48,7 @@ public struct RTStats
 public static class Data 
 {
     public static float rt_cutoff_min = .1f;
-    public static float rt_cutoff_max = 1.5f;
+    public static float rt_cutoff_max = 3f;
 
      /// <summary>
      /// Fetches an element from a string list by its ordianl position in the list, or returns an empty string, if the position exceeds the size of the list.

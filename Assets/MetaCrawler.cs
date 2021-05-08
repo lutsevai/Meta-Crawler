@@ -104,6 +104,25 @@ public class MetaCrawler
         List<string> merged = Data.merge(out_means, sep);
         File.WriteAllLines(outDir + "sample_rt_mean_speedrot" + MetaLog.logExtension, merged.ToArray());
 
+
+        //rotations averaged over all lvls
+        List<string>[] sample_mean_rt = new List<string>[MetaTypes.rotations.Length];
+        for(int i = 0; i < sample_mean_rt.Length; i++)
+        {
+            sample_mean_rt[i] = new List<string>();
+        }
+
+        for (int speedLvl = 0; speedLvl < sample_meanRt_speedrot.GetLength(1); speedLvl++)
+        {
+            for (int rot = 0; rot < sample_meanRt_speedrot.GetLength(0); rot++)
+            {
+                sample_mean_rt[speedLvl % MetaTypes.rotations.Length].AddRange(sample_meanRt_speedrot[rot, speedLvl]);
+            }
+        }
+        List<string> merged_all = Data.merge(sample_mean_rt, sep);
+        File.WriteAllLines(outDir + "sample_rt_mean" + MetaLog.logExtension, merged_all.ToArray());
+
+
         // per-subject mean rt for all zoids
         outputLines.Clear();
         foreach (KeyValuePair<string, double> s in subj_meanRt)
@@ -205,7 +224,8 @@ public class MetaCrawler
                     {
                         aboveMaxRt++;
                         badList.Add(rt);
-                    } else
+                    }
+                    else
                     {
                         goodRt++;
                     }
