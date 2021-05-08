@@ -118,7 +118,7 @@ public class MetaCrawler
                 sample_mean_rt[speedLvl % MetaTypes.rotations.Length].AddRange(sample_meanRt_speedrot[rot, speedLvl]);
             }
         }
-        File.WriteAllLines(outDir + "sample_rt_mean" + MetaLog.logExtension, Data.merge(out_means, sep));
+        File.WriteAllLines(outDir + "sample_rt_mean" + MetaLog.logExtension, Data.merge(sample_mean_rt, sep));
 
 
         // per-subject mean rt for all zoids
