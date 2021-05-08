@@ -101,8 +101,7 @@ public class MetaCrawler
                 out_means[speedLvl * MetaTypes.rotations.Length + rot] = sample_meanRt_speedrot[rot, speedLvl];
             }
         }
-        List<string> merged = Data.merge(out_means, sep);
-        File.WriteAllLines(outDir + "sample_rt_mean_speedrot" + MetaLog.logExtension, merged.ToArray());
+        File.WriteAllLines(outDir + "sample_rt_mean_speedrot" + MetaLog.logExtension, Data.merge(out_means, sep));
 
 
         //rotations averaged over all lvls
@@ -119,8 +118,7 @@ public class MetaCrawler
                 sample_mean_rt[speedLvl % MetaTypes.rotations.Length].AddRange(sample_meanRt_speedrot[rot, speedLvl]);
             }
         }
-        List<string> merged_all = Data.merge(sample_mean_rt, sep);
-        File.WriteAllLines(outDir + "sample_rt_mean" + MetaLog.logExtension, merged_all.ToArray());
+        File.WriteAllLines(outDir + "sample_rt_mean" + MetaLog.logExtension, Data.merge(out_means, sep));
 
 
         // per-subject mean rt for all zoids
@@ -293,15 +291,12 @@ public class MetaCrawler
                 allRots_allSpeedRanks.Add(list);
             }
 
-            List<string> mergedRots = Data.merge(listRots, sep);
-
             string fileName = String.Format("speedRank{0}_allRot", speedRank);
-            File.WriteAllLines(dirPath + fileName + MetaLog.logExtension, mergedRots.ToArray());
+            File.WriteAllLines(dirPath + fileName + MetaLog.logExtension, Data.merge(listRots, sep));
         }
 
         //Writing a summary file with all rts, categorized by rotation, and levels
-        List<string> allRots_allRanksMerged = Data.merge(allRots_allSpeedRanks.ToArray(), sep);
-        File.WriteAllLines(dirPath + "allRTs_allSpeedRanks" + MetaLog.logExtension, allRots_allRanksMerged.ToArray());
+        File.WriteAllLines(dirPath + "allRTs_allSpeedRanks" + MetaLog.logExtension, Data.merge(allRots_allSpeedRanks.ToArray(), sep));
 
 
 

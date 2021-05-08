@@ -76,7 +76,7 @@ public static class Data
 
 
 
-    public static List<string> merge(List<string>[] listarray, char sep)
+    public static string[] merge(List<string>[] listarray, char sep)
     {
         List<string> result = new List<string>();
 
@@ -102,7 +102,7 @@ public static class Data
             result.Add(line.Remove(line.Length - 1));
         }
 
-        return result;
+        return result.ToArray();
     }
 
 
@@ -117,7 +117,7 @@ public static class Data
     /// <param name="listarray">Main data structure, whose elements have to be merged.</param>
     /// <param name="sep">A separator which will be put between each merging element.</param>
     /// <returns>List of the merged string elements.</returns>
-    public static List<string> merge(List<RT>[] listarray, char sep)
+    public static string[] merge(List<RT>[] listarray, char sep)
     {
         List<string> result = new List<string>();
 
@@ -142,7 +142,7 @@ public static class Data
             //trims out the last sep-char, and adds to the results
             result.Add(line.Remove(line.Length - 1));
         }
-        return result;
+        return result.ToArray();
     }
 
 }
