@@ -38,7 +38,7 @@ public class MetaCrawler
 
     Dictionary<string, RTStats> subj_rtStats;
 
-
+    const bool onlyFinishedLvl = true;
 
 
     /// <summary>
@@ -220,6 +220,8 @@ public class MetaCrawler
                     }
                     else if (rt.val > Data.rt_cutoff_max)
                     {
+
+                        Debug.Log(cSid + " " + rt.val);
                         aboveMaxRt++;
                         badList.Add(rt);
                     }
@@ -463,12 +465,20 @@ public class MetaCrawler
             subj_rt_zoidlvl.Add(sid, rts_raw_subject);
         }
 
+        string[] finalLine = lines[lines.Length-1].Split('\t');
+        int finalLevel = int.Parse(finalLine[(int)Header.level]);
+
         //search for new zoid events + rt
         for (int i = startIndex; i < lines.Length; i++)
         {
             string[] lineSplit = lines[i].Split('\t');
             if (MetaLog.containsEvent(lineSplit, "ZOID", "NEW"))
             {
+                int level = int.Parse(lineSplit[(int)Header.level]);
+                
+                if ((level == finalLevel) && onlyFinishedLvl)
+                    break;
+
                 // search for the first action after zoid appearance
                 for (int j = i + 1; j < lines.Length; j++)
                 {
@@ -488,8 +498,7 @@ public class MetaCrawler
                             lineSplit_j[0] = diff.ToString();
                             RT r = new RT(diff, lineSplit_j);
 
-                            Zoid thisZoid = MetaTypes.GetZoidType(lineSplit_j[(int)Header.curr_zoid]);
-                            int level = int.Parse(lineSplit_j[(int)Header.level]);
+                            Zoid thisZoid = MetaTypes.GetZoidType(lineSplit_j[(int)Header.curr_zoid]);                         
                             rts_raw_subject[(int)thisZoid, level].Add(r);
                             output.Add(r);
                             break;
