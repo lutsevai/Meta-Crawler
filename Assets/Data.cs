@@ -47,9 +47,6 @@ public struct RTStats
 
 public static class Data 
 {
-    public static float rt_cutoff_min = 0f;
-    public static float rt_cutoff_max = 5f;
-
      /// <summary>
      /// Fetches an element from a string list by its ordianl position in the list, or returns an empty string, if the position exceeds the size of the list.
      /// </summary>
@@ -66,7 +63,7 @@ public static class Data
 
 
 
-    public static string getElem(List<RT> list, int i)
+    public static string GetElem(List<RT> list, int i)
     {
         if (i < list.Count)
             return list[i].metaData[(int)Header.timestamp];
@@ -76,7 +73,7 @@ public static class Data
 
 
 
-    public static string[] merge(List<string>[] listarray, char sep)
+    public static string[] Merge(List<string>[] listarray, char sep)
     {
         List<string> result = new List<string>();
 
@@ -117,7 +114,7 @@ public static class Data
     /// <param name="listarray">Main data structure, whose elements have to be merged.</param>
     /// <param name="sep">A separator which will be put between each merging element.</param>
     /// <returns>List of the merged string elements.</returns>
-    public static string[] merge(List<RT>[] listarray, char sep)
+    public static string[] Merge(List<RT>[] listarray, char sep)
     {
         List<string> result = new List<string>();
 
@@ -137,7 +134,7 @@ public static class Data
             string line = "";
             foreach (List<RT> list in listarray)
             {
-                line += getElem(list, i) + sep;
+                line += GetElem(list, i) + sep;
             }
             //trims out the last sep-char, and adds to the results
             result.Add(line.Remove(line.Length - 1));

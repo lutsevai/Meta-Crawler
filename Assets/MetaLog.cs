@@ -25,11 +25,11 @@ public static class MetaLog
         //get SID
         foreach (string line in lines)
         {
-            string[] lSplit = MetaLog.split(line);
+            string[] lSplit = MetaLog.Split(line);
 
-            if (containsEvent(lSplit, "SID"))
+            if (ContainsEvent(lSplit, "SID"))
                 return lSplit[(int)Header.evt_data1];
-            else if (containsEvent(lSplit, "GAME", "BEGIN"))
+            else if (ContainsEvent(lSplit, "GAME", "BEGIN"))
                 break;
         }
         return "NOSID";
@@ -48,9 +48,9 @@ public static class MetaLog
 
         foreach (string line in lines)
         {
-            string[] lSplit = MetaLog.split(line);
+            string[] lSplit = MetaLog.Split(line);
 
-            if (containsEvent(lSplit, "GAME", "BEGIN"))
+            if (ContainsEvent(lSplit, "GAME", "BEGIN"))
             {
                 found = true;
                 break;
@@ -96,7 +96,7 @@ public static class MetaLog
 
         int start = MetaLog.GetGameStart(lines);
 
-        string[] split = MetaLog.split(lines[start + 1]);
+        string[] split = MetaLog.Split(lines[start + 1]);
         int startlvl = int.Parse(split[(int)Header.level]);
 
         int minLength = 2200;
@@ -127,7 +127,7 @@ public static class MetaLog
     /// <param name="infile">Path to the file to be checked.</param>
     /// <param name="lines">Out array containing the data, if it turns out good. Otherwise, returns an empty array.</param>
     /// <returns>True if data worth being analyzed, and false, if not.</returns>
-    public static bool hasGoodData(string infile, out string[] lines)
+    public static bool HasGoodData(string infile, out string[] lines)
     {
         if (!MetaLog.IsLog(infile))
         {
@@ -144,21 +144,19 @@ public static class MetaLog
     /// Categorizes a data from file into play strategies: hypertapping, and das.
     /// </summary>
     /// <param name="infile">Path to the file that is to be analyzed.</param>
-    public static Strategy detectStrategyy(string[] lines)
+    public static Strategy DetectStrategyy(string[] lines)
     {
-        const int htap_threshhold = 6;
-
         int htaps = 0;
 
         for (int i = 0; i < lines.Length; i++)
         {
             //found enough evidence, halt loop
-            if (htaps > htap_threshhold)
+            if (htaps > Settings.minTapsPerEpisode)
                 break;
 
             string[] lineSplit = lines[i].Split('\t');
 
-            if (containsEvent(lineSplit, "ZOID", "NEW"))
+            if (ContainsEvent(lineSplit, "ZOID", "NEW"))
             {
                 int tapLeft = 0;
                 int tapRight = 0;
@@ -171,13 +169,13 @@ public static class MetaLog
 
                     // found key down
                     // todo: what about key up?!
-                    if (containsEvent(lineSplit_j, "PLAYER", "KEY_DOWN"))
+                    if (ContainsEvent(lineSplit_j, "PLAYER", "KEY_DOWN"))
                     {
                         //todo: implement pause
-                        if (!MetaTypes.isValidAction(lineSplit_j[(int)Header.evt_data2]))
+                        if (!MetaTypes.IsValidAction(lineSplit_j[(int)Header.evt_data2]))
                             continue;
 
-                        Action a = MetaTypes.getAction(lineSplit_j[(int)Header.evt_data2]);
+                        Action a = MetaTypes.GetAction(lineSplit_j[(int)Header.evt_data2]);
 
                         if ((!a.Equals(Action.Left)) && (!a.Equals(Action.Right)))
                             continue;
@@ -195,7 +193,7 @@ public static class MetaLog
                             tapRight++;
                     }
                     // no action found for current zoid,
-                    else if (containsEvent(lineSplit_j, "ZOID", "NEW"))
+                    else if (ContainsEvent(lineSplit_j, "ZOID", "NEW"))
                     {
                         // jump to the that line-1, do nothing
                         lastTap = Action.Down;
@@ -204,14 +202,14 @@ public static class MetaLog
                     }
                 }
 
-                if ((tapLeft > 4) || (tapRight > 4))
+                if ((tapLeft > Settings.minTapsPerEpisode) || (tapRight > Settings.minTapsPerEpisode))
                 {
                     htaps++;
                 }
             }
         }
 
-        if (htaps > htap_threshhold)
+        if (htaps > Settings.htapSample_min)
             return Strategy.hypertap;
         else
             return Strategy.das;
@@ -225,7 +223,7 @@ public static class MetaLog
     /// <param name="lineSplit">The line to be checked for the event.</param>
     /// <param name="event_id">Event string.</param>
     /// <returns>True if the line contains the event string.</returns>
-    public static bool containsEvent(string[] lineSplit, string event_id)
+    public static bool ContainsEvent(string[] lineSplit, string event_id)
     {
         if (lineSplit[(int)Header.evt_id].Equals(event_id))
         {
@@ -245,7 +243,7 @@ public static class MetaLog
     /// <param name="event_id">First portion of the event string.</param>
     /// <param name="event_data1">Second part of the event string.</param>
     /// <returns>True if the line contains the event string.</returns>
-    public static bool containsEvent(string[] lineSplit, string event_id, string event_data1)
+    public static bool ContainsEvent(string[] lineSplit, string event_id, string event_data1)
     {
         if (lineSplit[(int)Header.evt_id].Equals(event_id) && lineSplit[(int)Header.evt_data1].Equals(event_data1))
         {
@@ -260,7 +258,7 @@ public static class MetaLog
     /// <summary>
     /// Splits a tab separated line into an array
     /// </summary>
-    public static string[] split(string line)
+    public static string[] Split(string line)
     {
         return line.Split(sep);
     }

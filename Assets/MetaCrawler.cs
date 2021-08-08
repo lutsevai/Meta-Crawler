@@ -60,7 +60,7 @@ public class MetaCrawler
         subj_badLogs = new Dictionary<string, List<string>>();
         subj_rtStats = new Dictionary<string, RTStats>();
         DirectoryCrawler dirCrawler = new DirectoryCrawler();
-        rt_sampleActions = newRTTypeCounter();
+        rt_sampleActions = NewRTTypeCounter();
 
         // setting directories
         outDir = newOutDir + Path.GetFileName(newInDir.TrimEnd(Path.DirectorySeparatorChar)) + Path.DirectorySeparatorChar;
@@ -87,7 +87,7 @@ public class MetaCrawler
         //per-subject
         foreach (KeyValuePair<string, List<RT>[,]> kvp in subj_rt_zoidlvl)
         {
-            processRT(outDir + kvp.Key + @"\", kvp.Value, kvp.Key);
+            ProcessRT(outDir + kvp.Key + @"\", kvp.Value, kvp.Key);
         }
 
 
@@ -104,7 +104,7 @@ public class MetaCrawler
                 out_means[speedLvl * MetaTypes.rotations.Length + rot] = sample_meanRt_speedrot[rot, speedLvl];
             }
         }
-        File.WriteAllLines(outDir + "sample_rt_mean_speedrot" + MetaLog.logExtension, Data.merge(out_means, sep));
+        File.WriteAllLines(outDir + "sample_rt_mean_speedrot" + MetaLog.logExtension, Data.Merge(out_means, sep));
 
 
         //rotations averaged over all lvls
@@ -121,7 +121,7 @@ public class MetaCrawler
                 sample_mean_rt[rot].AddRange(sample_meanRt_speedrot[rot, speedLvl]);
             }
         }
-        File.WriteAllLines(outDir + "sample_rt_mean" + MetaLog.logExtension, Data.merge(sample_mean_rt, sep));
+        File.WriteAllLines(outDir + "sample_rt_mean" + MetaLog.logExtension, Data.Merge(sample_mean_rt, sep));
 
 
         WritePlayerActionTypes(outDir, rt_sampleActions);
@@ -166,7 +166,7 @@ public class MetaCrawler
 
         // HYPERTAP / DAS CATEGORIZATION
         // =============================
-        dirCrawler.WalkDirectoryTree(new DirectoryInfo(newInDir), processStrategy);
+        dirCrawler.WalkDirectoryTree(new DirectoryInfo(newInDir), ProcessStrategy);
 
         outputLines.Clear();
         outputLines.Add(string.Format("SID{0}DAS{0}H-TAP{0}", sep));
@@ -179,7 +179,7 @@ public class MetaCrawler
 
 
 
-    List<RT>[,] condenseToSpeedRotArray(List<RT>[,] rts_raw)
+    List<RT>[,] CondenseToSpeedRotArray(List<RT>[,] rts_raw)
     {
         List<RT>[,] current_rt_rotlvl = NewLoA(MetaTypes.rotations.Length, MetaTypes.speedLevels.Length);
 
@@ -202,7 +202,7 @@ public class MetaCrawler
 
 
 
-    void processRT(string dirPath, List<RT>[,] rts_raw, string cSid)
+    void ProcessRT(string dirPath, List<RT>[,] rts_raw, string cSid)
     {
         Directory.CreateDirectory(dirPath);
 
@@ -218,12 +218,12 @@ public class MetaCrawler
                 badList.Clear();
                 foreach (RT rt in rts_raw[zoid, level])
                 {
-                    if (rt.val < Data.rt_cutoff_min)
+                    if (rt.val < Settings.rtCutoff_min)
                     {
                         belowMinRt++;
                         badList.Add(rt);
                     }
-                    else if (rt.val > Data.rt_cutoff_max)
+                    else if (rt.val > Settings.rtCutoff_max)
                     {
 
                         Debug.Log(cSid + " " + rt.val);
@@ -262,7 +262,7 @@ public class MetaCrawler
         }
 
         // categorized reaction times by zoid [rotations, fall_speed] 
-        List<RT>[,] current_rt_rotlvl = condenseToSpeedRotArray(rts_raw);
+        List<RT>[,] current_rt_rotlvl = CondenseToSpeedRotArray(rts_raw);
 
 
         // write RT to separate files for each speedstep, and rotation type
@@ -299,11 +299,11 @@ public class MetaCrawler
             }
 
             string fileName = String.Format("speedRank{0}_allRot", speedRank);
-            File.WriteAllLines(dirPath + fileName + MetaLog.logExtension, Data.merge(listRots, sep));
+            File.WriteAllLines(dirPath + fileName + MetaLog.logExtension, Data.Merge(listRots, sep));
         }
 
         //Writing a summary file with all rts, categorized by rotation, and levels
-        File.WriteAllLines(dirPath + "allRTs_allSpeedRanks" + MetaLog.logExtension, Data.merge(allRots_allSpeedRanks.ToArray(), sep));
+        File.WriteAllLines(dirPath + "allRTs_allSpeedRanks" + MetaLog.logExtension, Data.Merge(allRots_allSpeedRanks.ToArray(), sep));
 
 
 
@@ -350,20 +350,20 @@ public class MetaCrawler
         // --------------
 
         //initialize basic structure
-        int[,,] rt_playerActions = newRTTypeCounter();
+        int[,,] rt_playerActions = NewRTTypeCounter();
 
-        countActionTypes(current_rt_rotlvl, rt_playerActions);
+        CountActionTypes(current_rt_rotlvl, rt_playerActions);
 
         WritePlayerActionTypes(dirPath, rt_playerActions);
     }
 
 
     private static void WritePlayerActionTypes(string dirPath, int[,,] rt_playerActions)
-    {
-        // RT Action type output
+    {  
+        // RT Action type per level output
+        // -------------------------------
         //initialize output structure of lines to be written out. +1 Length for header
         string[] actionLines = new string[Enum.GetValues(typeof(Action)).Length + 1];
-
         // make header
         string rotLines_header = "" + sep;
         foreach (int i in MetaTypes.speedLevels)
@@ -394,9 +394,10 @@ public class MetaCrawler
         File.WriteAllLines(dirPath + "rt_actions_rot-speedlvl" + MetaLog.logExtension, actionLines);
 
 
-        // MEAN
-
-
+        // RT Action type aggregated output
+        // --------------------------------
+        
+        // initialize summary structure
         int[,] aggregratedRTTypes = new int[MetaTypes.rotations.Length, Enum.GetValues(typeof(Action)).Length];
 
         for (int i = 0; i < rt_playerActions.GetLength(0); i++)
@@ -404,10 +405,10 @@ public class MetaCrawler
                 for (int k = 0; k < rt_playerActions.GetLength(2); k++)
                     aggregratedRTTypes[i, k] += rt_playerActions[i, j, k];
 
-        // RT Action type output
         //initialize output structure of lines to be written out. +1 Length for header
         string[] actionLines_mean = new string[Enum.GetValues(typeof(Action)).Length + 1];
 
+        //make header
         string rotLines_header_mean = "" + sep;
         foreach (int r in MetaTypes.rotations)
         {
@@ -428,7 +429,7 @@ public class MetaCrawler
     }
 
 
-    private void countActionTypes(List<RT>[,] current_rt_rotlvl, int[,,] rt_playerActions)
+    private void CountActionTypes(List<RT>[,] current_rt_rotlvl, int[,,] rt_playerActions)
     {
         // count each type of rt separateley
         for (int speedRank = 0; speedRank < current_rt_rotlvl.GetLength(1); speedRank++)
@@ -438,9 +439,9 @@ public class MetaCrawler
             {
                 foreach (RT lineSplit in current_rt_rotlvl[rot, speedRank])
                 {
-                    if (MetaTypes.isValidAction(lineSplit.metaData[(int)Header.evt_data2]))
+                    if (MetaTypes.IsValidAction(lineSplit.metaData[(int)Header.evt_data2]))
                     {
-                        Action p = MetaTypes.getAction(lineSplit.metaData[(int)Header.evt_data2]);
+                        Action p = MetaTypes.GetAction(lineSplit.metaData[(int)Header.evt_data2]);
                         rt_playerActions[rot, speedRank, (int)p] += 1;
                         rt_sampleActions[rot, speedRank, (int)p] += 1;
                     }
@@ -450,13 +451,13 @@ public class MetaCrawler
     }
 
 
-    void processStrategy(string infile)
+    void ProcessStrategy(string infile)
     {
         string[] lines;
-        if (!MetaLog.hasGoodData(infile, out lines))
+        if (!MetaLog.HasGoodData(infile, out lines))
             return;
 
-        Strategy strat = MetaLog.detectStrategyy(lines);
+        Strategy strat = MetaLog.DetectStrategyy(lines);
         string sid = MetaLog.getSid(lines);
 
         int[] s;
@@ -481,7 +482,7 @@ public class MetaCrawler
             return;
 
         // if file is not worth analyzing, adds it to the bad files list, and exits this methods
-        if (!MetaLog.hasGoodData(inPath, out lines))
+        if (!MetaLog.HasGoodData(inPath, out lines))
         {
             string badSid = MetaLog.getSid(lines);
             List<string> badFiles;
@@ -517,7 +518,7 @@ public class MetaCrawler
         for (int i = startIndex; i < lines.Length; i++)
         {
             string[] lineSplit = lines[i].Split('\t');
-            if (MetaLog.containsEvent(lineSplit, "ZOID", "NEW"))
+            if (MetaLog.ContainsEvent(lineSplit, "ZOID", "NEW"))
             {
                 int level = int.Parse(lineSplit[(int)Header.level]);
 
@@ -531,7 +532,7 @@ public class MetaCrawler
 
                     // found key down
                     // todo: what about key up?!
-                    if (MetaLog.containsEvent(lineSplit_j, "PLAYER", "KEY_DOWN"))
+                    if (MetaLog.ContainsEvent(lineSplit_j, "PLAYER", "KEY_DOWN"))
                     {
                         // add it, if both times are not different
                         // todo: check frequency of presses, perhaps they coincide, because it is anticipated
@@ -552,7 +553,7 @@ public class MetaCrawler
                         break;
                     }
                     // no action found for current zoid,
-                    else if (MetaLog.containsEvent(lineSplit_j, "ZOID", "NEW"))
+                    else if (MetaLog.ContainsEvent(lineSplit_j, "ZOID", "NEW"))
                     {
                         // jump to the that line-1, do nothing
                         i = j - 1;
@@ -654,9 +655,7 @@ public class MetaCrawler
 
 
 
-
-
-    public static int[,,] newRTTypeCounter()
+    public static int[,,] NewRTTypeCounter()
     {
         int[,,] rt_playerActions = new int[MetaTypes.rotations.Length, MetaTypes.speedLevels.Length, Enum.GetValues(typeof(Action)).Length];
         for (int i = 0; i < rt_playerActions.GetLength(0); i++)

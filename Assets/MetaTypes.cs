@@ -42,7 +42,7 @@ public static class MetaTypes
     // ACTION
     // ======
 
-    public static bool isValidAction(string actionString)
+    public static bool IsValidAction(string actionString)
     {
         foreach (Action a in Enum.GetValues(typeof(Action)))
         {
@@ -54,7 +54,7 @@ public static class MetaTypes
         return false;
     }
 
-    public static Action getAction(string actionString)
+    public static Action GetAction(string actionString)
     {
         foreach (Action a in Enum.GetValues(typeof(Action)))
         {
