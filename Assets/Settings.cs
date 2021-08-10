@@ -6,37 +6,23 @@ public static class Settings
 
     public static string outDir_default = @"D:\documents\data\meta-two\rt\";
 
-    //TODO: Implement the logic for these settings.
     public static bool discardIncompleteLvl = true;
-    public static bool onlyLastCompletedLvl = false;
+    public static bool onlyLastLvl = false;
     
-    // levels to analyze
-    public static int minLvl = 0;
-    public static int maxLvl = 29;
-    
-    // minimum amount of episodes in a log to be considered for analysis
-    public static int minLogEpisodes = 14;
+    // level range to analyze inside a log
+    public static int minLvl = 3;
+    public static int maxLvl = 6;
 
-    // Level boundries of a log to be considered for analysis.
-    // When not met, the logs is completely discarded .
-    public static int minStartLvl_cutoff = 0;
-    public static int maxEndLvl_cutoff = 29;
+    // Requirements for a log files to be considered for analysis. If not met, log is discarded entirely.
+    public static int log_minEpisodes = 14;
+    public static int log_minStartLvl = 0;
+    public static int log_maxEndLvl = 29;
 
-
+    // HyperTapping detection
     public static int minTapsPerEpisode = 4;
     public static int htapSample_min = 6;
 
     public static float rtCutoff_min = 0f;
     public static float rtCutoff_max = 30f;
-
-
-    public static void Reset()
-    {
-        discardIncompleteLvl = true;
-        onlyLastCompletedLvl = false;
-        minLvl = 0;
-        maxLvl = 29;
-        minLogEpisodes = 0;
-    }
 
 }

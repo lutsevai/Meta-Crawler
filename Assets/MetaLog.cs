@@ -97,10 +97,10 @@ public static class MetaLog
         int endlvl = int.Parse(endline[(int)Header.level]);
         int endEpisode = int.Parse(endline[(int)Header.episode_number]);
 
-        if (endEpisode < Settings.minLogEpisodes)
+        if (endEpisode < Settings.log_minEpisodes)
             return false;
      
-        if (startlvl < Settings.minStartLvl_cutoff || endlvl > Settings.maxEndLvl_cutoff) 
+        if (startlvl < Settings.log_minStartLvl || endlvl > Settings.log_maxEndLvl) 
            return false;
 
         return true;

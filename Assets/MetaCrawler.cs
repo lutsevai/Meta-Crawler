@@ -38,8 +38,6 @@ public class MetaCrawler
 
     Dictionary<string, RTStats> subj_rtStats;
 
-    const bool onlyFinishedLvl = true;
-
     int[,,] rt_sampleActions;
 
 
@@ -502,18 +500,15 @@ public class MetaCrawler
 
         // initialize / find subject - specific structure
         if (subj_rt_zoidlvl.ContainsKey(sid))
-        {
             subj_rt_zoidlvl.TryGetValue(sid, out rts_raw_subject);
-        }
         else
-        {
-            rts_raw_subject = NewLoA_Raw();
-            subj_rt_zoidlvl.Add(sid, rts_raw_subject);
-        }
+            rts_raw_subject = NewLoA_Raw();            
+
 
         string[] finalLine = lines[lines.Length - 1].Split('\t');
         int finalLevel = int.Parse(finalLine[(int)Header.level]);
 
+        int rtCount = 0;
         //search for new zoid events + rt
         for (int i = startIndex; i < lines.Length; i++)
         {
@@ -522,8 +517,13 @@ public class MetaCrawler
             {
                 int level = int.Parse(lineSplit[(int)Header.level]);
 
-                if ((level == finalLevel) && onlyFinishedLvl)
+                if (((level == finalLevel) && Settings.discardIncompleteLvl)
+                    || level > Settings.maxLvl)
                     break;
+
+                if ((level < Settings.minLvl) ||
+                    (level != (finalLevel - 1) && Settings.onlyLastLvl ) )
+                    continue;
 
                 // search for the first action after zoid appearance
                 for (int j = i + 1; j < lines.Length; j++)
@@ -538,6 +538,7 @@ public class MetaCrawler
                         // todo: check frequency of presses, perhaps they coincide, because it is anticipated
                         if (!lineSplit_j[(int)Header.timestamp].Equals(lineSplit[0]))
                         {
+                            rtCount++;
                             float diff = float.Parse(lineSplit_j[(int)Header.timestamp]) - float.Parse(lineSplit[0]);
 
                             //TODO: careful, as sometimes the string from the metadata is being used. Make universal
@@ -562,10 +563,16 @@ public class MetaCrawler
                 }
             }
         }
-        string outFile = Path.GetFileName(inPath);
-        string outDir = this.outDir + sid + @"\";
-        Directory.CreateDirectory(outDir);
-        WriteRTsToFile(outDir + outFile + "_RT", output);
+
+        if (rtCount > 0)
+        {
+            if (!subj_rt_zoidlvl.ContainsKey(sid))
+                subj_rt_zoidlvl.Add(sid, rts_raw_subject);
+            string outFile = Path.GetFileName(inPath);
+            string outDir = this.outDir + sid + @"\";
+            Directory.CreateDirectory(outDir);
+            WriteRTsToFile(outDir + outFile + "_RT", output);
+        }
     }
 
 
