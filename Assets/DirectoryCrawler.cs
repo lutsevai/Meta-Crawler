@@ -1,11 +1,12 @@
-using System.Collections;
-using System.Collections.Generic;
 using System;
 using System.IO;
 using UnityEngine;
 
 
+
 public delegate void fileTask(string inPath);
+
+
 
 public class DirectoryCrawler
 {
