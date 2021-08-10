@@ -100,7 +100,7 @@ public static class MetaLog
         if (endEpisode < Settings.minLogEpisodes)
             return false;
      
-        if (endlvl < Settings.minStartLvl_cutoff || startlvl > Settings.maxEndLvl_cutoff) 
+        if (startlvl < Settings.minStartLvl_cutoff || endlvl > Settings.maxEndLvl_cutoff) 
            return false;
 
         return true;
@@ -241,6 +241,8 @@ public static class MetaLog
         }
     }
 
+
+    //TODO: Enforce this across the entire program.
     /// <summary>
     /// Splits a tab separated line into an array
     /// </summary>
