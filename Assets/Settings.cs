@@ -1,19 +1,18 @@
-using System.Collections;
-using System.Collections.Generic;
+using System.IO;
 
-public static class Settings 
+public static class Settings
 {
 
     public static string outDir_default = @"D:\documents\data\meta-two\rt\";
 
     public static bool discardIncompleteLvl = true;
-    public static bool onlyLastLvl = false;
-    
-    // level range to analyze inside a log
-    public static int minLvl = 3;
-    public static int maxLvl = 6;
+    public static bool onlyLastLvl = true;
 
-    // Requirements for a log files to be considered for analysis. If not met, log is discarded entirely.
+    // level range to analyze inside a log
+    public static int minLvl = 0;
+    public static int maxLvl = 29;
+
+    // Requirements for a log file to be considered for analysis. If not met, log is discarded entirely.
     public static int log_minEpisodes = 14;
     public static int log_minStartLvl = 0;
     public static int log_maxEndLvl = 29;
@@ -24,5 +23,22 @@ public static class Settings
 
     public static float rtCutoff_min = 0f;
     public static float rtCutoff_max = 30f;
+
+    public static void PrintTo(string path)
+    {
+        File.WriteAllLines(path + "Settings.txt", new string[]{
+            "discardIncompleteLvl = " + discardIncompleteLvl.ToString(),
+            "onlyLastLvl = " + onlyLastLvl.ToString(),
+            "minLvl = " + minLvl.ToString(),
+            "maxLvl = " + maxLvl.ToString(),
+            "log_minEpisodes = " + log_minEpisodes.ToString(),
+            "log_minStartLvl = " + log_minStartLvl.ToString(),
+            "log_maxEndLvl = " + log_maxEndLvl.ToString(),
+            "minTapsPerEpisode = " + minTapsPerEpisode.ToString(),
+            "htapSample_min = " + htapSample_min.ToString(),
+            "rtCutoff_min = " + rtCutoff_min.ToString(),
+            "rtCutoff_min = " + rtCutoff_max.ToString()
+        });
+    }
 
 }

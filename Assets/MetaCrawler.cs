@@ -75,6 +75,8 @@ public class MetaCrawler
             dir.Delete(true);
         }
 
+        Settings.PrintTo(outDir);
+
         List<string> outputLines = new List<string>();
 
 
