@@ -8,12 +8,11 @@ public class MainCanvasScript : MonoBehaviour
     public InputField inDirField;
     public InputField outDirField;
 
-    const string outDir_standard = @"D:\documents\data\meta-two\rt\";
 
     // Start is called before the first frame update
     void Start()
     {
-        outDirField.text = outDir_standard;
+        outDirField.text = Settings.outDir_default;
     }
 
     // Update is called once per frame

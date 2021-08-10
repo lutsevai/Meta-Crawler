@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System;
+using System.IO;
 using UnityEngine;
 
 
@@ -23,14 +24,13 @@ public class DirectoryCrawler
         // than the application provides.
         catch (UnauthorizedAccessException e)
         {
-            // This code just writes out the message and continues to recurse.
-            // You may decide to do something different here. For example, you
-            // can try to elevate your privileges and access the file again.
+            //TODO: create log file
             Debug.Log(e.Message);
         }
 
         catch (System.IO.DirectoryNotFoundException e)
         {
+            //TODO: create log file
             Debug.Log(e.Message);
         }
 
@@ -38,14 +38,16 @@ public class DirectoryCrawler
         {
             foreach (System.IO.FileInfo fi in files)
             {
-                processFile(fi.FullName);
-
-                //TODO:
-                // In this example, we only access the existing FileInfo object. If we
-                // want to open, delete or modify the file, then
-                // a try-catch block is required here to handle the case
-                // where the file has been deleted since the call to TraverseTree().
-                //Debug.Log(fi.FullName);
+                try
+                {
+                    processFile(fi.FullName);
+                }
+                // In case the file was moved / deleted since the call to TraverseTree() / WalkDirectoryTree().
+                catch (FileNotFoundException e)
+                {
+                    Debug.Log(e.Message);
+                    // TODO: create log file                
+                }
             }
 
             // Now find all the subdirectories under this directory.
