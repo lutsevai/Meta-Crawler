@@ -5,7 +5,7 @@ using System;
 using System.IO;
 
 
-//column nr:      0            1           2             3           4      5          6          7        8           9          10        11
+//column nr:             0            1           2             3           4      5          6          7        8           9          10        11
 public enum Header { timestamp, system_ticks, event_type, episode_number, level, score, lines_cleared, evt_id, evt_data1, evt_data2, curr_zoid, next_zoid };
 
 
@@ -14,6 +14,7 @@ public static class MetaLog
 {
     public const string logExtension = ".tsv";
     const char sep = '\t';
+
 
     /// <summary>
     /// Finds the subject ID in passed game log data.
@@ -68,7 +69,8 @@ public static class MetaLog
 
     public static bool IsLog(string path)
     {
-        if ((!Path.GetExtension(path).Equals(logExtension)) || (Path.GetFileNameWithoutExtension(path).Contains("tobii-sync")))
+        if ((!Path.GetExtension(path).Equals(MetaLog.logExtension)) 
+            || (Path.GetFileNameWithoutExtension(path).Contains("tobii-sync")))
             return false;
 
         return true;
@@ -78,46 +80,30 @@ public static class MetaLog
 
     public static bool IsGoodData(string[] lines)
     {
-        //initial check, in case not even header is fully present
-        if (lines.Length < 50)
+        // initial check, in case not even header is fully present
+        if (lines.Length < 30)
             return false;
 
+        // discard all TEST subjects
         string sid = getSid(lines);
         if (sid.ToLower().Contains("test"))
             return false;
 
-        //todo: temporary here, should remove it 
-        //string[] endline = MetaLog.split(lines[lines.Length - 1]);
-        //int endlvl = int.Parse(endline[(int)Header.level]);
-
-        //if (endlvl > 8) 
-        //    return false;
-
-
         int start = MetaLog.GetGameStart(lines);
+        string[] startLine = MetaLog.Split(lines[start + 1]);
+        int startlvl = int.Parse(startLine[(int)Header.level]);
 
-        string[] split = MetaLog.Split(lines[start + 1]);
-        int startlvl = int.Parse(split[(int)Header.level]);
+        string[] endline = MetaLog.Split(lines[lines.Length - 1]);
+        int endlvl = int.Parse(endline[(int)Header.level]);
+        int endEpisode = int.Parse(endline[(int)Header.episode_number]);
 
-        int minLength = 2200;
-
-        // approximately 15 episodes
-        //todo: catch bad lvl
-        switch (startlvl)
-        {
-            case 0:
-                minLength = 2200;
-                break;
-            case 7:
-                minLength = 2100;
-                break;
-        }
-
-        if (lines.Length < minLength)
+        if (endEpisode < Settings.minLogEpisodes)
             return false;
+     
+        if (endlvl < Settings.minStartLvl_cutoff || startlvl > Settings.maxEndLvl_cutoff) 
+           return false;
 
         return true;
-
     }
 
 
